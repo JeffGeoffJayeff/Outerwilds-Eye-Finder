@@ -50,6 +50,19 @@ class point:
             self.z = new_xyz[2]
         else:
             print("ERROR: Length isn't proper")
+    @property
+    def displacementMag(self):
+        return math.sqrt(self.x**2+self.y**2+self.z**2)
+    @property #Returns the unit vector of the displacement vector
+    def unitvec(self): 
+        mag = self.displacementMag
+        if self.displacementMag == 0:
+            return np.asarray([0,0,0])
+        else:
+            x = self.x/mag
+            y = self.y/mag
+            z = self.z/mag
+            return np.asarray([x,y,z])
 class orbit:
     def __init__(self,SemiMajorAxis,e,parentmass,foci:point = None,Omega:float = 0, i:float = 0, omega:float = 0, name:str = "Default", parent = None):
         if e < 0:
@@ -287,7 +300,6 @@ class planet(orbit):
             self.has_water = False
         self.air_density = air_density #This is based off of the value found in the game files
 class StationaryPlanet(planet): #This is really only going to be used for the white hole and the sun but whatever
-    # This should never have 
     def __init__(self, SemiMajorAxis=1, e=0, parentmass=1, foci=None, Omega=0, i=0, omega=0, name="Default", parent=None, mass = 10, linearGravity=False, surfradius = 1, atmoradius:float = 0, air_density = 0,anchor:point=point(0,0,0)):
         super().__init__(SemiMajorAxis, e, parentmass, foci, Omega, i, omega, name, parent, mass, linearGravity, surfradius, atmoradius, air_density)
         self.anchor = anchor
@@ -330,6 +342,30 @@ class MagicallyMovingPlanet(planet): #This is for planets moving at a constant v
             x[i] = self.Foci.x + self.vel_vec[0]*time
             y[i] = self.Foci.y + self.vel_vec[1]*time
             z[i] = self.Foci.z + self.vel_vec[2]*time
+        self.DF = pd.DataFrame({
+            "time":a,
+            "x":x,
+            "y":y,
+            "z":z,
+            "body": np.full(points,self.name)
+        })
+        if (self.parent is not None):
+            if (self.parent.DF is None):
+                self.parent.createDataFrame(stepsize,endminute)
+            self.DF["x"] = self.DF["x"] + self.parent.DF["x"]
+            self.DF["y"] = self.DF["y"] + self.parent.DF["y"]
+            self.DF["z"] = self.DF["z"] + self.parent.DF["z"]
+        print(f"{self.name}'s Dataframe made!")
+class StrangerMotion(planet): #This is just for the stranger, which based on my understanding of the RingWorldController script, departs 405 seconds after the loop begins, and is constantly accelerating at units of 0.2 m/s^2
+    def __init__(self, SemiMajorAxis, e, parentmass, foci=None, Omega=0, i=0, omega=0, name="Default", parent=None, mass = None, linearGravity=False, surfradius = None, atmoradius = None, air_density = 0, water_radius=None, visit_radius = 1):
+        super().__init__(SemiMajorAxis, e, parentmass, foci, Omega, i, omega, name, parent, mass, linearGravity, surfradius, atmoradius, air_density, water_radius, visit_radius)
+    def createDataFrame(self,departtime = 405,accelmag = 0.2, stepsize = 1 / 24, endminute = 1):
+        print(f"Creating {self.name}'s Dataframe...",end="")
+        a = np.arange(0,endminute*60,stepsize)
+        points = len(a)
+        x = np.zeros(points)
+        y = np.zeros(points)
+        z = np.zeros(points)
         self.DF = pd.DataFrame({
             "time":a,
             "x":x,

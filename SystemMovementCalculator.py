@@ -6,6 +6,11 @@ import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
 
+# Purpose: The point of this file is to calculate the position of each body at a specific time, and output them to a file 
+# These files are the ones in "Bodies"
+# It also graphs their positions as refactoring it into a separate program is an entire thing
+
+
 G = 1*10**(-3) #Gravitational Constant
 sun_mass = 4*10**11
 sun_radius = 2000
