@@ -357,15 +357,28 @@ class MagicallyMovingPlanet(planet): #This is for planets moving at a constant v
             self.DF["z"] = self.DF["z"] + self.parent.DF["z"]
         print(f"{self.name}'s Dataframe made!")
 class StrangerMotion(planet): #This is just for the stranger, which based on my understanding of the RingWorldController script, departs 405 seconds after the loop begins, and is constantly accelerating at units of 0.2 m/s^2
-    def __init__(self, SemiMajorAxis, e, parentmass, foci=None, Omega=0, i=0, omega=0, name="Default", parent=None, mass = None, linearGravity=False, surfradius = None, atmoradius = None, air_density = 0, water_radius=None, visit_radius = 1):
+    #Foci is the point it starts at
+    def __init__(self, SemiMajorAxis=1, e=0, parentmass=1, foci=None, Omega=0, i=0, omega=0, name="Default", parent=None, mass = None, linearGravity=False, surfradius = None, atmoradius = None, air_density = 0, water_radius=None, visit_radius = 1):
         super().__init__(SemiMajorAxis, e, parentmass, foci, Omega, i, omega, name, parent, mass, linearGravity, surfradius, atmoradius, air_density, water_radius, visit_radius)
     def createDataFrame(self,departtime = 405,accelmag = 0.2, stepsize = 1 / 24, endminute = 1):
         print(f"Creating {self.name}'s Dataframe...",end="")
         a = np.arange(0,endminute*60,stepsize)
+        unitvector = self.Foci.unitvec
         points = len(a)
         x = np.zeros(points)
         y = np.zeros(points)
         z = np.zeros(points)
+        for i in range(points):
+            time = a[i]
+            if time < departtime:
+                x[i] = self.Foci.x
+                y[i] = self.Foci.y
+                z[i] = self.Foci.z
+            else:
+                x[i] = self.Foci.x + accelmag*unitvector[0]/2*(time-departtime)**2
+                y[i] = self.Foci.y + accelmag*unitvector[1]/2*(time-departtime)**2
+                z[i] = self.Foci.z + accelmag*unitvector[2]/2*(time-departtime)**2
+
         self.DF = pd.DataFrame({
             "time":a,
             "x":x,

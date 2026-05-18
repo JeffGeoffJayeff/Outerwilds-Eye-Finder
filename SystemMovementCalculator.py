@@ -119,6 +119,9 @@ Interloper.surface_radius = 83
 
 WhiteHole = OG.StationaryPlanet(anchor=OG.point(-23000,0,0), name="White Hole",parent=Sun)
 WhiteHole.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
+
+RingWorld = OG.StrangerMotion(foci=OG.point(8168.197,8400,2049.528),name="The Stranger",parent=Sun)
+RingWorld.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
 #All bodies to be displayed/saved
 BodiesList = [Sun,
               SunStation, 
@@ -132,7 +135,8 @@ BodiesList = [Sun,
               ORP,
               DarkBramble,
               Interloper,
-              WhiteHole]
+              WhiteHole,
+              RingWorld]
 if Savemotion:
     numofbody = len(BodiesList)
     for i in range(numofbody):
@@ -178,6 +182,7 @@ if graphresults:
         DarkBramble.name: "#55503a",
         Interloper.name: "#349fb9",
         WhiteHole.name: "#D3D3D3",
+        RingWorld.name: "#22a185",
         "Probe":"#FF8C00"
     }
     if Path:
