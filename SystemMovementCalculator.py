@@ -15,10 +15,10 @@ G = 1*10**(-3) #Gravitational Constant
 sun_mass = 4*10**11
 sun_radius = 2000
 ### Config Stuff
-Stepsize = 3 #In seconds
+Stepsize = 1/60 #In seconds
 EndMinute = 23 #Timeloop ends at 22:40 in the games, in minutes btw
-graphresults = True #Make a graph of the planet positions? (Doesn't do well with lots of points)
-Savemotion = False #Save the position of all bodies to file?
+graphresults = False #Make a graph of the planet positions? (Doesn't do well with lots of points)
+Savemotion = True #Save the position of all bodies to file?
 Path = graphresults #Shows the trajectory of probe path
 BodyPaths = graphresults #Whether to show the path of the bodies in the system or not
 
@@ -29,6 +29,7 @@ Twin_mass = 1.6*10**6
 Sun = OG.StationaryPlanet(mass=sun_mass,anchor=OG.point(0,0,0),name="Sun")
 Sun.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
 Sun.surface_radius = sun_radius
+Sun.visit_radius = 4500
 
 SunStation = OG.planet(50,0,sun_mass,name="Sun Station",parent=Sun)
 SunStation.useStartingPoint(-0.001220703,-2296)
@@ -40,6 +41,7 @@ FocalBody.useStartingPoint(-2867.882,4095.762)
 FocalBody.isGravityLinear = False
 FocalBody.mass = Twin_mass
 FocalBody.createDataFrame(endminute=EndMinute,stepsize=Stepsize,)
+FocalBody.visit_radius = 1000
 
 CaveTwin = OG.planet(250,0,FocalBody.mass,name="Ember Twin",parent=FocalBody,mass=1.6*10**6,linearGravity=True)
 CaveTwin.Inclination = math.pi
@@ -59,6 +61,7 @@ TowerTwin.surface_radius = 170
 TowerTwin.air_radius = 250
 TowerTwin.air_density = 1.2
 
+
 TimberHearth = OG.planet(50,0.7,sun_mass,foci=OG.point(init_pos=[0,0,0]),name="Timber Hearth",parent=Sun)
 TimberHearth.isGravityLinear = True
 TimberHearth.mass = 3*10**6
@@ -67,9 +70,12 @@ TimberHearth.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
 TimberHearth.surface_radius = 254
 TimberHearth.air_radius = 380
 TimberHearth.air_density = 1.2
+TimberHearth.visit_radius = 600
 
 Attlerock = OG.planet(900,0,sun_mass,name="Attlerock",parent=TimberHearth,mass=5*10**7)
 Attlerock.Period = 50
+Attlerock.surface_radius = 80
+Attlerock.visit_radius = 160
 Attlerock.useStartingPoint(886.327,156.283)
 Attlerock.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
 
@@ -81,6 +87,7 @@ BrittleHollow.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
 BrittleHollow.surface_radius = 272
 BrittleHollow.air_radius = 500
 BrittleHollow.air_density = 1.2
+BrittleHollow.visit_radius = 600
 
 HollowLantern = OG.planet(1000,0,sun_mass,parent=BrittleHollow,name="Hollow's Lantern",mass=9.10*10**5,linearGravity=True)
 HollowLantern.Period = 84
@@ -89,6 +96,7 @@ HollowLantern.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
 HollowLantern.surface_radius = 97.3
 HollowLantern.air_radius = 150
 HollowLantern.air_density = 0.6
+HollowLantern.visit_radius = HollowLantern.surface_radius*2
 
 GiantsDeep = OG.planet(10,0,sun_mass,name="Giant's Deep",parent=Sun,mass=2.18*10**7)
 GiantsDeep.mass = 2.18*10**7
@@ -98,6 +106,7 @@ GiantsDeep.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
 GiantsDeep.surface_radius = 200#Where the core starts
 GiantsDeep.air_radius = 950
 GiantsDeep.water_radius = 500
+GiantsDeep.visit_radius = 1000
 
 ORP = OG.planet(10,0,GiantsDeep.mass,parent=GiantsDeep,name="Cannon")
 ORP.useStartingPoint(-1006.406,653.57)
@@ -109,6 +118,7 @@ DarkBramble.useStartingPoint(-3472.959,19696.16)
 DarkBramble.isGravityLinear = True
 DarkBramble.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
 DarkBramble.surface_radius = 203.3
+DarkBramble.visit_radius = 500
 
 Interloper = OG.planet(50,0,sun_mass,foci=OG.point(init_pos=[0,0,0]),name="The Interloper",parent=Sun,mass=5.50*10**5)
 Interloper.useStartingPointInterloper(-24100,0)
@@ -116,12 +126,17 @@ Interloper.isGravityLinear = True
 Interloper.Inclination = math.pi
 Interloper.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
 Interloper.surface_radius = 83
+Interloper.visit_radius = Interloper.surface_radius*2
+
 
 WhiteHole = OG.StationaryPlanet(anchor=OG.point(-23000,0,0), name="White Hole",parent=Sun)
 WhiteHole.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
+WhiteHole.visit_radius = 500
 
-RingWorld = OG.StrangerMotion(foci=OG.point(8168.197,8400,2049.528),name="The Stranger",parent=Sun)
+RingWorld = OG.StrangerMotion(foci=OG.point(8168.197,2049.528,8400),name="The Stranger",parent=Sun)
 RingWorld.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
+RingWorld.surface_radius = 300
+RingWorld.visit_radius = 800
 #All bodies to be displayed/saved
 BodiesList = [Sun,
               SunStation, 
@@ -151,6 +166,7 @@ if Savemotion:
                 "air_density":[i.air_density for i in BodiesList],
                 "has_water":[i.has_water for i in BodiesList],
                 "water_radius":[i.water_radius for i in BodiesList],
+                "visit_radius":[i.visit_radius for i in BodiesList],
                 "name":[i.name for i in BodiesList]})
     propertiestable.to_pickle("Properties.pkl")
 if graphresults:

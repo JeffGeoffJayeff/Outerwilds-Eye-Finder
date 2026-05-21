@@ -29,6 +29,7 @@ class Body:
         self.air_density = 1
         self.has_water = False
         self.water_radius = 1
+        self.visit_radius = 2
         self.name = "DefaultName"
         if propertiesDataframe is not None:
             self.surface_radius = propertiesDataframe["surface_radius"]
@@ -39,7 +40,14 @@ class Body:
             self.air_density = propertiesDataframe["air_density"]
             self.has_water = propertiesDataframe["has_water"]
             self.water_radius = propertiesDataframe["water_radius"]
+            self.visit_radius = propertiesDataframe["visit_radius"]
             self.name = propertiesDataframe["name"]
+        print(self)
+    def __str__(self):
+        string = ""
+        for k,v in self.__dict__.items():
+            string += f"{str(k)}: {str(v)}\n"
+        return string
     def getXYZ(self,time:float):
         estimatedindex = time/self.timestep 
         np.clip(estimatedindex,0,(len(self.array)-1)) #Keep index in range
@@ -179,6 +187,11 @@ def random_3d_unit_vector():
     y = r*np.sin(phi)
     return np.array([x,y,z])
     
+def make_visit_event(body):
+    def visit_event(t, S):
+        shippos = np.asarray([S[0],S[2],S[4]])
+        #if np.isnan(body.visi)
+
 
 hitBody.terminal = True
 Bodies = [] #Create list to store bodies into
@@ -186,12 +199,13 @@ Names = []
 for i in range(0,len(files)): #Load in bodies
     Bodies.append(Body(np.load(files[i]),Properties.iloc[i]))
     Names.append(Bodies[i].name)
+    if Bodies[i].name == "Cannon":
+        Cannon = Bodies[i]
     if Properties.iloc[i]["isGravityLinear"]:
         Bodies[i].converttoRealGravity()
-Cannon = Bodies[9]
 unitvec = random_3d_unit_vector()
 print(unitvec)
-mag = 500 #np.random.uniform(50,250)
+mag = 500 
 print(mag)
 #unitvec = np.asarray([0.92224781,-0.06100891,0.38175502])
 #mag = 217.4160386926305

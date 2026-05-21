@@ -288,7 +288,7 @@ class planet(orbit):
         self.isGravityLinear = linearGravity
         self.surface_radius = surfradius #Radius of the surface, if the probe ever goes within this radius of the point of the planet it is just said to have had crashed
         self.air_radius = atmoradius #Radius of atmosphere
-        self.visit_radius = visit_radius
+        self.visit_radius = visit_radius #Radius for which the probe is considered to have "visited" the body, bit arbitrary but should be interesting
         if atmoradius is not None:
             self.has_atmosphere = True #This should probably have some function to update it but these are short lived objects anyways
         else:
