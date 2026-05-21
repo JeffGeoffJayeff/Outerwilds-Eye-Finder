@@ -82,7 +82,7 @@ class orbit:
         else:
             self.Foci = foci
         self._Omega:float = Omega #Longitude of the ascending node
-        self._i:float = i #Inclination
+        self._i:float = i #Inclination in radians
         self._omega:float = omega #Argument of periapsis
         self.DF = None
         self.name = name

@@ -16,7 +16,8 @@ G = 10**-3
 eye_distance = 286500 #Distance of the eye from the sun in meters https://www.reddit.com/r/outerwilds/comments/t7mxcy/how_far_away_is_the_eye_base_game_spoilers/
 sunBodyIndex = 0 #Index that is the Sun in the Bodies list
 NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
-n_sims = 100 #Number of simulations to run
+n_sim = 10
+Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
 
 class Body:
@@ -152,6 +153,9 @@ class probe:
                 print(f"Reached Eye Distance: {self.path.t_events[i]}")
             else:
                 print(f"{Bodies[i].name} Visit Times: {self.path.t_events[i]}")
+    def Results(self):
+        output = []
+        return
 def calculateDrag(relativeFluidVelocity,fluidDensity:float,dt):
     advectionmagnitude = np.linalg.norm(relativeFluidVelocity)
     dragmagintude = 0.5*fluidDensity*(advectionmagnitude)**2*0.00392*dt
@@ -248,7 +252,8 @@ def cartToSpherical(coordinates:np.array): #Convert cartesian coordinates to sph
 hitBody.terminal = True
 eyeDistance.terminal = False
 eyeDistance.direction = 1 #Trigger when the probe leaves the sphere that represents the eye
-Bodies = [] #Create list to store bodies into
+Bodies = [] #Create list to store bodies into 
+#Making this a global variable is a bit messed up but whatever
 Names = []
 for i in range(0,len(files)): #Load in bodies
     Bodies.append(Body(np.load(files[i]),Properties.iloc[i]))
@@ -316,3 +321,34 @@ fig.add_surface(x=spherex, y=spherey, z=spherez, opacity=1.0,showscale=False)
 fig.update_scenes(aspectmode='cube') #Making the axes be a cube
 fig.show()
 np.save("probepath.npy",probepath)
+
+# Create res
+results = np.empty(
+    n_sim,
+    dtype = [
+        ("Launch x",np.float32),
+        ("Launch y",np.float32),
+        ("Launch z",np.float32),
+        ("Launch Velocity",np.float32),
+        ("Reached Eye",np.bool_),
+        ("Eye Shell Time",np.float32), #The time the probe reaches 286 km or whatever it is
+        ("Eye Shell Polar",np.float32), #The polar of the above point
+        ("Eye Shell Azimuth",np.float32), #Azimuth of the above point
+        ("Sun Visits",np.int16),
+        ("Sun Station Visits",np.int16),
+        ("Ember Twin Visits",np.int16),
+        ("Ash Twin Visits", np.int16),
+        ("Timber Hearth Visits",np.int16),
+        ("Attlerock Visits", np.int16),
+        ("Brittle Hollow Visits", np.int16),
+        ("Hollow's Lantern Visits", np.int16),
+        ("Giant's Deep Visits",np.int16),
+        ("Cannon Visits",np.int16),
+        ("Dark Bramble Visits",np.int16),
+        ("White Hole Visits", np.int16),
+        ("Random Eye Visits", np.int16),
+        ("Hit Something", np.bool_), #Whether or not the probe hit something
+        ("Body Hit", "U2")
+    ]
+)
+print(results)
