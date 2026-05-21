@@ -42,7 +42,6 @@ class Body:
             self.water_radius = propertiesDataframe["water_radius"]
             self.visit_radius = propertiesDataframe["visit_radius"]
             self.name = propertiesDataframe["name"]
-        print(self)
     def __str__(self):
         string = ""
         for k,v in self.__dict__.items():
@@ -112,9 +111,14 @@ class probe:
     def runSimulation(self):
         initXYZ = self.launchbody.getXYZ(self.launchtime)
         
-        self.path = solve_ivp(self.dSdt, [self.launchtime,(self.endtime)*60],y0 = [initXYZ[0],self.initialvel[0],initXYZ[1],self.initialvel[1],initXYZ[2],self.initialvel[2]],t_eval=np.arange(0,(self.endtime)*60,self.timestep),events=hitBody)
+        self.path = solve_ivp(self.dSdt, [self.launchtime,(self.endtime)*60],y0 = [initXYZ[0],self.initialvel[0],initXYZ[1],self.initialvel[1],initXYZ[2],self.initialvel[2]],t_eval=np.arange(0,(self.endtime)*60,self.timestep),events=events)
         print("Simulation done!")
-        
+    def printSimulationEvents(self):
+        for i in range(len(events)):
+            if i == (len(events)-1):
+                print(f"Hitting Event: {self.path.t_events[i]}")
+            else:
+                print(f"{Bodies[i].name} Visit Times: {self.path.t_events[i]}")
 def calculateDrag(relativeFluidVelocity,fluidDensity:float,dt):
     advectionmagnitude = np.linalg.norm(relativeFluidVelocity)
     dragmagintude = 0.5*fluidDensity*(advectionmagnitude)**2*0.00392*dt
@@ -187,10 +191,17 @@ def random_3d_unit_vector():
     y = r*np.sin(phi)
     return np.array([x,y,z])
     
-def make_visit_event(body):
+def make_visit_event(body:Body): 
     def visit_event(t, S):
         shippos = np.asarray([S[0],S[2],S[4]])
-        #if np.isnan(body.visi)
+        if np.isnan(body.visit_radius):
+            return 1 #Return 1 if there is no visit radius for the body
+        else:
+            distance = np.linalg.norm(body.getXYZ(t) - shippos)
+            return distance
+    visit_event.direction = -1
+    visit_event.terminal = False
+    return visit_event
 
 
 hitBody.terminal = True
@@ -209,12 +220,15 @@ mag = 500
 print(mag)
 #unitvec = np.asarray([0.92224781,-0.06100891,0.38175502])
 #mag = 217.4160386926305
-#unitvec = np.asarray([0.93382793,0.11072035,0.34015645])
-#mag = 181.33680249823882
+unitvec = np.asarray([0.93382793,0.11072035,0.34015645])
+mag = 181.33680249823882
 #unitvec = np.asarray([0.22402356,0.97440414,0.01870879]) #Hit ember twin
 #mag = 55.57546653762513
+events = [make_visit_event(body) for body in Bodies] #Make visiting events
+events.append(hitBody) #Add hitting event
 Test = probe(Cannon,mag,np.asarray(unitvec),0,timestep=1/60,endtime=22)
 Test.runSimulation()
+Test.printSimulationEvents()
 
 
 ### Plotting
@@ -230,7 +244,7 @@ probepath[:,0] = Test.path.t
 probepath[:,1:4] = Test.path.y[[0,2,4],:].T
 
 range = [-800000,800000]
-step = 60*3
+step = 60*1 #Step in stepsizes
 fig = px.scatter_3d(x=probepath[:,1][::step],y=probepath[:,2][::step],z=probepath[:,3][::step],animation_frame=probepath[:,0][::step],range_x=range,range_y=range,range_z=range) #
 fig.add_trace(go.Scatter3d(
             x=probepath[:,1][::step],
