@@ -19,8 +19,8 @@ Stepsize = 1 #In seconds
 EndMinute = 23 #Timeloop ends at 22:40 in the games, in minutes btw
 graphresults = True #Make a graph of the planet positions? (Doesn't do well with lots of points)
 Savemotion = False #Save the position of all bodies to file?
-Path = graphresults #Shows the trajectory of probe path
-BodyPaths = graphresults #Whether to show the path of the bodies in the system or not
+Path = True #Shows the trajectory of probe path
+BodyPaths =  False #graphresults #Whether to show the path of the bodies in the system or not
 
 Twin_period = math.pi*2*250/28.28427
 Twin_mass = 1.6*10**6

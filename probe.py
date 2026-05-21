@@ -16,6 +16,7 @@ G = 10**-3
 eye_distance = 286500 #Distance of the eye from the sun in meters https://www.reddit.com/r/outerwilds/comments/t7mxcy/how_far_away_is_the_eye_base_game_spoilers/
 sunBodyIndex = 0 #Index that is the Sun in the Bodies list
 NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
+n_sims = 100 #Number of simulations to run
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
 
 class Body:
@@ -45,17 +46,22 @@ class Body:
             self.water_radius = propertiesDataframe["water_radius"]
             self.visit_radius = propertiesDataframe["visit_radius"]
             self.name = propertiesDataframe["name"]
-        print(self)
     def __str__(self):
         string = ""
         for k,v in self.__dict__.items():
             string += f"{str(k)}: {str(v)}\n"
         return string
-    def getXYZ(self,time:float):
+    def getXYZ(self,time:float): 
         estimatedindex = time/self.timestep 
         np.clip(estimatedindex,0,(len(self.array)-1)) #Keep index in range
         index = math.trunc(estimatedindex) #Just going to round down
-        return np.array(self.array[index,1:4])
+        if index < (len(self.array[:,0])-1): #Do some linear interpolation as long as it isn't the last entry
+            Y_2 = np.array(self.array[index+1,1:4])
+            Y_1 = np.array(self.array[index,1:4])
+            position = Y_1 + (Y_2-Y_1)/(self.timestep)*(time-self.array[index,0])
+        else:
+            position = np.array(self.array[index,1:4])
+        return position
     def getVel(self,time:float):
         start = self.getXYZ(time)
         end = self.getXYZ(time+self.timestep)
@@ -75,7 +81,7 @@ class probe:
         self.launchvector = self.direction*self.launch_velcoity_mag #Launch velocity vector
         self.initialvel = self.findLaunchVelVec(launchtime,self.launchvector) #Launch velocity vector accounting for the initial motion of the launch body
         self.currentlyVisiting = None #Acts as a latch to track when the probe is 'visiting' a certain body, when it gets close to a body but doesn't hit it
-
+        self.path = None
         self.launchtime = launchtime #When the probe is launched
         self.endtime = endtime #When to end simulation, in minutes
         self.timestep = timestep 
@@ -121,7 +127,24 @@ class probe:
         
         self.path = solve_ivp(self.dSdt, [self.launchtime,(self.endtime)*60],y0 = [initXYZ[0],self.initialvel[0],initXYZ[1],self.initialvel[1],initXYZ[2],self.initialvel[2]],t_eval=np.arange(0,(self.endtime)*60,self.timestep),events=events)
         print("Simulation done!")
+    def getXYZ(self,time:float): #TODO: Some more input handling should be added to this
+        if self.path == None:
+            print("ERROR: Can't get XYZ as simulation has not been run yet!")
+            return
+        estimatedindex = time/self.timestep 
+        np.clip(estimatedindex,0,(len(self.path.t)-1)) #Keep index in range
+        index = math.trunc(estimatedindex) #Just going to round down
+        if index < (len(self.path.t)-1): #Do some linear interpolation as long as it isn't the last entry
+            Y_2 = self.path.y[[0,2,4],index+1].T
+            Y_1 = self.path.y[[0,2,4],index].T
+            position = Y_1 + (Y_2-Y_1)/(self.timestep)*(time-self.path.t[index])
+        else:
+            position = self.path.y[[0,2,4],index].T
+        return position
     def printSimulationEvents(self):
+        if self.path == None:
+            print("ERROR: Simulation has not been run yet!")
+            return
         for i in range(len(events)):
             if i == (len(events)-1):
                 print(f"Hitting Event: {self.path.t_events[i]}") #Better way to write this but who cares
@@ -207,7 +230,7 @@ def make_visit_event(body:Body):
         if np.isnan(body.visit_radius):
             return 1 #Return 1 if there is no visit radius for the body
         else:
-            distance = np.linalg.norm(body.getXYZ(t) - shippos)
+            distance = np.linalg.norm(body.getXYZ(t) - shippos) - body.visit_radius #negative if in visit radius, positive if not
             return distance
     visit_event.direction = -1
     visit_event.terminal = False
@@ -215,7 +238,12 @@ def make_visit_event(body:Body):
 def eyeDistance(t, S):
     shippos = np.asarray([S[0],S[2],S[4]])
     return np.linalg.norm(Bodies[sunBodyIndex].getXYZ(t)-shippos) - eye_distance #Negative if closer than the Eye is 
-
+def cartToSpherical(coordinates:np.array): #Convert cartesian coordinates to spherical in radial, azimuthal, polar coordinates https://mathworld.wolfram.com/SphericalCoordinates.html
+    coordinates = np.asarray(coordinates)
+    r = np.linalg.norm(coordinates)
+    theta = math.atan2(coordinates[1],coordinates[0]) #arctan(y/x)
+    phi = math.acos(coordinates[2]/r) #acos(z/r)
+    return np.asarray([r,theta,phi])
 ## Program actually starts here
 hitBody.terminal = True
 eyeDistance.terminal = False
@@ -262,20 +290,18 @@ print(mag)
 Test = probe(Cannon,mag,np.asarray(unitvec),0,timestep=1/60,endtime=22)
 Test.runSimulation()
 Test.printSimulationEvents()
-
-
-### Plotting
+## Plotting
 sun_radius = 2000
 spherephi, spheretheta = np.mgrid[0.0:np.pi:20j, 0.0:2.0 * np.pi:20j] #Change the 20j to somethingelsej if you want different resolution on the sphere
     
-    # Get Cartesian mesh grid
+# Get Cartesian mesh grid
 spherex = sun_radius*np.sin(spherephi) * np.cos(spheretheta)
 spherey = sun_radius*np.sin(spherephi) * np.sin(spheretheta)
 spherez = sun_radius*np.cos(spherephi)
 probepath = np.zeros((len(Test.path.t),4))
 probepath[:,0] = Test.path.t
 probepath[:,1:4] = Test.path.y[[0,2,4],:].T
-
+print(f"Time: {Test.path.t_events[15]}, Cartesian Coordinates: {Test.getXYZ(Test.path.t_events[15][0])}, Spherical {cartToSpherical(Test.getXYZ(Test.path.t_events[15][0]))}")
 range = [-800000,800000]
 step = 60*1 #Step in stepsizes
 fig = px.scatter_3d(x=probepath[:,1][::step],y=probepath[:,2][::step],z=probepath[:,3][::step],animation_frame=probepath[:,0][::step],range_x=range,range_y=range,range_z=range) #
