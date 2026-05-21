@@ -15,7 +15,7 @@ G = 1*10**(-3) #Gravitational Constant
 sun_mass = 4*10**11
 sun_radius = 2000
 ### Config Stuff
-Stepsize =1#1/60 #In seconds
+Stepsize = 1 #In seconds
 EndMinute = 23 #Timeloop ends at 22:40 in the games, in minutes btw
 graphresults = True #Make a graph of the planet positions? (Doesn't do well with lots of points)
 Savemotion = False #Save the position of all bodies to file?
@@ -32,6 +32,8 @@ Sun.surface_radius = sun_radius
 Sun.visit_radius = 4500
 
 SunStation = OG.planet(50,0,sun_mass,name="Sun Station",parent=Sun)
+SunStation.surface_radius = 20
+SunStation.visit_radius = 50
 SunStation.useStartingPoint(-0.001220703,-2296)
 SunStation.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
 
@@ -51,6 +53,7 @@ CaveTwin.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
 CaveTwin.surface_radius = 169
 CaveTwin.air_radius = 250
 CaveTwin.air_density = 1.2
+CaveTwin.visit_radius = 300
 
 TowerTwin = OG.planet(250,0,FocalBody.mass,name="Ash Twin",parent=FocalBody,mass=1.6*10**6,linearGravity=True)
 TowerTwin.Inclination = math.pi
@@ -60,7 +63,7 @@ TowerTwin.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
 TowerTwin.surface_radius = 170
 TowerTwin.air_radius = 250
 TowerTwin.air_density = 1.2
-
+TowerTwin.visit_radius = 300
 
 TimberHearth = OG.planet(50,0.7,sun_mass,foci=OG.point(init_pos=[0,0,0]),name="Timber Hearth",parent=Sun)
 TimberHearth.isGravityLinear = True

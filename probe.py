@@ -13,7 +13,10 @@ Properties = pd.read_pickle("Properties.pkl")
 bodiesfolder = Path("Bodies")
 files = list(bodiesfolder.glob("*.npy"))
 G = 10**-3
-
+eye_distance = 286500 #Distance of the eye from the sun in meters https://www.reddit.com/r/outerwilds/comments/t7mxcy/how_far_away_is_the_eye_base_game_spoilers/
+sunBodyIndex = 0 #Index that is the Sun in the Bodies list
+NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
+# If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
 
 class Body:
     def __init__(self,timeandpos,propertiesDataframe = None):
@@ -42,6 +45,7 @@ class Body:
             self.water_radius = propertiesDataframe["water_radius"]
             self.visit_radius = propertiesDataframe["visit_radius"]
             self.name = propertiesDataframe["name"]
+        print(self)
     def __str__(self):
         string = ""
         for k,v in self.__dict__.items():
@@ -58,8 +62,10 @@ class Body:
         vel = end - start
         return vel
     def converttoRealGravity(self):
-        self.isGravityLinear = False
+        oldMass = self.mass
         self.mass = self.mass*self.surface_radius
+        self.isGravityLinear = False
+        print(f"{self.name} mass has been changed from {oldMass} to {self.mass}")
 
 class probe:
     def __init__(self,launchbody:Body,launchvel:float,launchunitvector:np.ndarray=[1,0,0],launchtime=0,endtime:float=(22+2/3),timestep:float=1/24):
@@ -85,8 +91,10 @@ class probe:
             #Acceleration due to gravity
             if np.isnan(body.mass): #These bodies shouldn't have gravity, the None gets turned into Nan, 
                 continue
+            elif body.isGravityLinear: #If gravity is linear than we remove the bottom part
+                a += G * body.mass * diff / dist**2
             else:
-                a += G * body.mass* diff / dist**3
+                a += G * body.mass * diff / dist**3
             #Acceleration due to drag
             if np.isnan(body.air_radius): 
                 continue
@@ -116,7 +124,9 @@ class probe:
     def printSimulationEvents(self):
         for i in range(len(events)):
             if i == (len(events)-1):
-                print(f"Hitting Event: {self.path.t_events[i]}")
+                print(f"Hitting Event: {self.path.t_events[i]}") #Better way to write this but who cares
+            elif i == (len(events) - 2):
+                print(f"Reached Eye Distance: {self.path.t_events[i]}")
             else:
                 print(f"{Bodies[i].name} Visit Times: {self.path.t_events[i]}")
 def calculateDrag(relativeFluidVelocity,fluidDensity:float,dt):
@@ -202,9 +212,14 @@ def make_visit_event(body:Body):
     visit_event.direction = -1
     visit_event.terminal = False
     return visit_event
+def eyeDistance(t, S):
+    shippos = np.asarray([S[0],S[2],S[4]])
+    return np.linalg.norm(Bodies[sunBodyIndex].getXYZ(t)-shippos) - eye_distance #Negative if closer than the Eye is 
 
-
+## Program actually starts here
 hitBody.terminal = True
+eyeDistance.terminal = False
+eyeDistance.direction = 1 #Trigger when the probe leaves the sphere that represents the eye
 Bodies = [] #Create list to store bodies into
 Names = []
 for i in range(0,len(files)): #Load in bodies
@@ -212,20 +227,38 @@ for i in range(0,len(files)): #Load in bodies
     Names.append(Bodies[i].name)
     if Bodies[i].name == "Cannon":
         Cannon = Bodies[i]
-    if Properties.iloc[i]["isGravityLinear"]:
-        Bodies[i].converttoRealGravity()
+events = [make_visit_event(body) for body in Bodies] #Make visiting events
+events.append(eyeDistance) #Add event for reaching the distance that the eye is from the Sun
+events.append(hitBody) #Add hitting event
+
+if NormalGravityforAll:
+    print("Changing masses for Newtonian gravitation...")
+    for i in range(len(Bodies)):
+        CurrentBody = Bodies[i]
+        if CurrentBody.isGravityLinear == True: #Just making this explicit here
+            if np.isnan(CurrentBody.mass):
+                print(f"{CurrentBody.name} has NAN mass, skipping")
+                continue
+            if np.isnan(CurrentBody.surface_radius):
+                print(f"{CurrentBody.name} has no surface, skipping")
+                continue #Avoiding issues with NANs
+            elif CurrentBody.surface_radius == 0:
+                print(f"{CurrentBody.name} has a surface radius of 0, skipping")
+                continue
+            else:
+                CurrentBody.converttoRealGravity()
+        else:
+            print(f"{CurrentBody.name} already has Newtonian gravity")
+            continue
+else:
+    print("Using In-Game gravity")
+## Probe settings
 unitvec = random_3d_unit_vector()
 print(unitvec)
 mag = 500 
 print(mag)
-#unitvec = np.asarray([0.92224781,-0.06100891,0.38175502])
-#mag = 217.4160386926305
-unitvec = np.asarray([0.93382793,0.11072035,0.34015645])
-mag = 181.33680249823882
-#unitvec = np.asarray([0.22402356,0.97440414,0.01870879]) #Hit ember twin
-#mag = 55.57546653762513
-events = [make_visit_event(body) for body in Bodies] #Make visiting events
-events.append(hitBody) #Add hitting event
+
+## Probe Simulation
 Test = probe(Cannon,mag,np.asarray(unitvec),0,timestep=1/60,endtime=22)
 Test.runSimulation()
 Test.printSimulationEvents()
