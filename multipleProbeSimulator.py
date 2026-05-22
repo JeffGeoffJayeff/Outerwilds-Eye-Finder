@@ -52,14 +52,3 @@ if NormalGravityforAll:
             continue
 else:
     print("Using In-Game gravity")
-
-results = np.empty(
-    n_sim,
-    dtype = [
-        ("Reached Eye",np.bool_),
-        ("Sun Visits",np.int16),
-        ("Sun Station Visits",np.int16),
-        ("Ember Twin Visits",np.int16),
-        ("Ash Twin Visits", np.int16)
-    ]
-)

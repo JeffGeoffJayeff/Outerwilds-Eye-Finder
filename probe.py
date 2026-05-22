@@ -7,6 +7,7 @@ from scipy.integrate import solve_ivp
 from scipy.optimize import minimize
 import plotly.express as px
 import plotly.graph_objects as go
+import multiprocessing
 
 #np.seterr(all='raise')
 Properties = pd.read_pickle("Properties.pkl")
@@ -16,9 +17,10 @@ G = 10**-3
 eye_distance = 286500 #Distance of the eye from the sun in meters https://www.reddit.com/r/outerwilds/comments/t7mxcy/how_far_away_is_the_eye_base_game_spoilers/
 sunBodyIndex = 0 #Index that is the Sun in the Bodies list
 NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
-n_sim = 10
+n_sim = 93181
 Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
+plotPath = False #Whether to plot or not
 
 class Body:
     def __init__(self,timeandpos,propertiesDataframe = None):
@@ -75,13 +77,12 @@ class Body:
         print(f"{self.name} mass has been changed from {oldMass} to {self.mass}")
 
 class probe:
-    def __init__(self,launchbody:Body,launchvel:float,launchunitvector:np.ndarray=[1,0,0],launchtime=0,endtime:float=(22+2/3),timestep:float=1/24):
+    def __init__(self,launchbody:Body,launchvel:float,launchunitvector:np.ndarray=np.asarray([1,0,0]),launchtime=0,endtime:float=(22+2/3),timestep:float=1/24):
         self.launchbody = launchbody
-        self.launch_velcoity_mag = launchvel #Magnitude of launch velocity
+        self.launch_velocity_mag = launchvel #Magnitude of launch velocity
         self.direction = launchunitvector #Unit vector of direction of launch velocity
-        self.launchvector = self.direction*self.launch_velcoity_mag #Launch velocity vector
+        self.launchvector = self.direction*self.launch_velocity_mag #Launch velocity vector
         self.initialvel = self.findLaunchVelVec(launchtime,self.launchvector) #Launch velocity vector accounting for the initial motion of the launch body
-        self.currentlyVisiting = None #Acts as a latch to track when the probe is 'visiting' a certain body, when it gets close to a body but doesn't hit it
         self.path = None
         self.launchtime = launchtime #When the probe is launched
         self.endtime = endtime #When to end simulation, in minutes
@@ -117,17 +118,15 @@ class probe:
                 else:
                     #Do air drag
                     a += calculateDrag(relativefluidvel,body.air_density,self.timestep)
-        return a
-                    
+        return a                   
     def dSdt(self,t,S):
         x, vx, y, vy, z, vz = S
         acc = self.netAcceleration(t,S)
         return [vx,acc[0],vy,acc[1],vz,acc[2]]
     def runSimulation(self):
         initXYZ = self.launchbody.getXYZ(self.launchtime)
-        
         self.path = solve_ivp(self.dSdt, [self.launchtime,(self.endtime)*60],y0 = [initXYZ[0],self.initialvel[0],initXYZ[1],self.initialvel[1],initXYZ[2],self.initialvel[2]],t_eval=np.arange(0,(self.endtime)*60,self.timestep),events=events)
-        print("Simulation done!")
+        #print("Simulation done!")
     def getXYZ(self,time:float): #TODO: Some more input handling should be added to this
         if self.path == None:
             print("ERROR: Can't get XYZ as simulation has not been run yet!")
@@ -147,15 +146,84 @@ class probe:
             print("ERROR: Simulation has not been run yet!")
             return
         for i in range(len(events)):
-            if i == (len(events)-1):
+            if i == (len(Bodies)+1): #Body visit events are always first
                 print(f"Hitting Event: {self.path.t_events[i]}") #Better way to write this but who cares
-            elif i == (len(events) - 2):
+            elif i == (len(Bodies)):
                 print(f"Reached Eye Distance: {self.path.t_events[i]}")
             else:
                 print(f"{Bodies[i].name} Visit Times: {self.path.t_events[i]}")
+    def ChangeLaunchConditions(self,launchbody:Body,launchvel:float,launchunitvector:np.ndarray=np.asarray([1,0,0]),launchtime=0):
+        self.launchbody = launchbody
+        self.launchtime = launchtime #When the probe is launched
+        self.launch_velocity_mag = launchvel #Magnitude of launch velocity
+        self.direction = launchunitvector #Unit vector of direction of launch velocity
+        self.launchvector = self.direction*self.launch_velocity_mag #Launch velocity vector
+        self.initialvel = self.findLaunchVelVec(launchtime,self.launchvector) #Launch velocity vector accounting for the initial motion of the launch body
     def Results(self):
-        output = []
-        return
+        output = [] #23
+        output.extend(self.direction) #Adding Launch XYZ
+        output.append(self.launch_velocity_mag) #Adding launch velocity
+        output.append(self.arrivedAtEye) #Eye Tracking stuff
+        if self.arrivedAtEye: 
+            output.append(self.eyeArrivalTime)
+            cartcoords =  self.getXYZ(self.eyeArrivalTime)
+            sphericalcoords = cartToSpherical(cartcoords)
+            output.extend([sphericalcoords[1],sphericalcoords[2]])
+        else:
+            output.extend([np.nan,np.nan,np.nan])
+        #Visting Bodies stuff
+        for i in range(len(Bodies)):
+            output.append(self.path.t_events[i].size)
+        output.append(self.hitSomething)#Hit something
+        if self.hitSomething:
+            output.append(self.closestObjectIndex(self.hitTime))
+        else:
+            output.append(np.nan)
+        return tuple(output)
+    def closestObjectIndex(self,time:float):
+        distances = np.zeros(len(Bodies))
+        for i in range(len(Bodies)):
+            if i == 0: #there is a way tomake this better but I won't
+                SurfaceRadius = sunRadiusCalculator(time)
+            else:
+                SurfaceRadius = Bodies[i].surface_radius
+            if np.isnan(SurfaceRadius):
+                distances[i] = np.linalg.norm(Bodies[i].getXYZ(time) - self.getXYZ(time))
+            else:
+                distances[i] = max(np.linalg.norm(Bodies[i].getXYZ(time) - self.getXYZ(time)) - SurfaceRadius,0) #Keep values above 0, turn negative values in 0
+        return np.argmin(distances)
+    @property
+    def eyeArrivalTime(self):
+        if self.path == None:
+            print("ERROR: Trying to get eye arrival time before the probe has been simulated!")
+            return
+        elif self.arrivedAtEye:
+            return self.path.t_events[len(Bodies)][0]
+        else: #Didn't reach eye
+            return np.nan
+    @property
+    def arrivedAtEye(self): #Probably a better way to write this
+        if self.path == None:
+            print("ERROR: 001 Simulate the probe first")
+            return np.nan
+        else:
+            return self.path.t_events[len(Bodies)].size > 0
+    @property
+    def hitSomething(self):
+        if self.path == None:
+            print("ERROR: 002 Simulate the probe first")
+            return np.nan
+        else:
+            return self.path.t_events[len(Bodies)+1].size > 0
+    @property
+    def hitTime(self):
+        if self.path == None:
+            print("ERROR: 003 Simulate the probe first")
+            return np.nan
+        elif self.hitSomething:
+            return self.path.t_events[len(Bodies)+1][0]
+        else: #Didn't hit anything
+            return np.nan 
 def calculateDrag(relativeFluidVelocity,fluidDensity:float,dt):
     advectionmagnitude = np.linalg.norm(relativeFluidVelocity)
     dragmagintude = 0.5*fluidDensity*(advectionmagnitude)**2*0.00392*dt
@@ -288,7 +356,7 @@ else:
 ## Probe settings
 unitvec = random_3d_unit_vector()
 print(unitvec)
-mag = 500 
+mag = 100
 print(mag)
 
 ## Probe Simulation
@@ -298,37 +366,36 @@ Test.printSimulationEvents()
 ## Plotting
 sun_radius = 2000
 spherephi, spheretheta = np.mgrid[0.0:np.pi:20j, 0.0:2.0 * np.pi:20j] #Change the 20j to somethingelsej if you want different resolution on the sphere
-    
+if plotPath:
 # Get Cartesian mesh grid
-spherex = sun_radius*np.sin(spherephi) * np.cos(spheretheta)
-spherey = sun_radius*np.sin(spherephi) * np.sin(spheretheta)
-spherez = sun_radius*np.cos(spherephi)
-probepath = np.zeros((len(Test.path.t),4))
-probepath[:,0] = Test.path.t
-probepath[:,1:4] = Test.path.y[[0,2,4],:].T
-print(f"Time: {Test.path.t_events[15]}, Cartesian Coordinates: {Test.getXYZ(Test.path.t_events[15][0])}, Spherical {cartToSpherical(Test.getXYZ(Test.path.t_events[15][0]))}")
-range = [-800000,800000]
-step = 60*1 #Step in stepsizes
-fig = px.scatter_3d(x=probepath[:,1][::step],y=probepath[:,2][::step],z=probepath[:,3][::step],animation_frame=probepath[:,0][::step],range_x=range,range_y=range,range_z=range) #
-fig.add_trace(go.Scatter3d(
-            x=probepath[:,1][::step],
-            y=probepath[:,2][::step],
-            z=probepath[:,3][::step],
-            mode='lines',
-            name="probe trajectory",
-        ))
-fig.add_surface(x=spherex, y=spherey, z=spherez, opacity=1.0,showscale=False)
-fig.update_scenes(aspectmode='cube') #Making the axes be a cube
-fig.show()
-np.save("probepath.npy",probepath)
-
-# Create res
+    spherex = sun_radius*np.sin(spherephi) * np.cos(spheretheta)
+    spherey = sun_radius*np.sin(spherephi) * np.sin(spheretheta)
+    spherez = sun_radius*np.cos(spherephi)
+    probepath = np.zeros((len(Test.path.t),4))
+    probepath[:,0] = Test.path.t
+    probepath[:,1:4] = Test.path.y[[0,2,4],:].T
+    print(f"Time: {Test.path.t_events[15]}, Cartesian Coordinates: {Test.getXYZ(Test.path.t_events[15][0])}, Spherical {cartToSpherical(Test.getXYZ(Test.path.t_events[15][0]))}")
+    range = [-800000,800000]
+    step = 60*1 #Step in stepsizes
+    fig = px.scatter_3d(x=probepath[:,1][::step],y=probepath[:,2][::step],z=probepath[:,3][::step],animation_frame=probepath[:,0][::step],range_x=range,range_y=range,range_z=range) #
+    fig.add_trace(go.Scatter3d(
+                x=probepath[:,1][::step],
+                y=probepath[:,2][::step],
+                z=probepath[:,3][::step],
+                mode='lines',
+                name="probe trajectory",
+            ))
+    fig.add_surface(x=spherex, y=spherey, z=spherez, opacity=1.0,showscale=False)
+    fig.update_scenes(aspectmode='cube') #Making the axes be a cube
+    fig.show()
+    np.save("probepath.npy",probepath)
+# Create results
 results = np.empty(
     n_sim,
     dtype = [
-        ("Launch x",np.float32),
-        ("Launch y",np.float32),
-        ("Launch z",np.float32),
+        ("Launch x",np.float64),
+        ("Launch y",np.float64),
+        ("Launch z",np.float64),
         ("Launch Velocity",np.float32),
         ("Reached Eye",np.bool_),
         ("Eye Shell Time",np.float32), #The time the probe reaches 286 km or whatever it is
@@ -345,10 +412,22 @@ results = np.empty(
         ("Giant's Deep Visits",np.int16),
         ("Cannon Visits",np.int16),
         ("Dark Bramble Visits",np.int16),
+        ("Interloper Visits", np.int16),
         ("White Hole Visits", np.int16),
+        ("Stranger Visits", np.int16),
         ("Random Eye Visits", np.int16),
         ("Hit Something", np.bool_), #Whether or not the probe hit something
-        ("Body Hit", "U2")
+        ("Body Hit", np.float16) #index of whatever body it hit
     ]
 )
+for i in range(n_sim):
+    unitvec = random_3d_unit_vector()
+    mag = 500
+    Test.ChangeLaunchConditions(Cannon,mag,unitvec,0)
+    Test.runSimulation()
+    
+    results[i] = Test.Results()
+    print(f"Simulation {i+1} of {n_sim} complete")
 print(results)
+np.save("results3.npy",results)
+np.savetxt("results2.csv",results,delimiter=",")
