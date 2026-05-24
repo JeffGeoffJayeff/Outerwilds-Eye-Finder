@@ -1,4 +1,4 @@
-from asyncio import events
+
 
 import numpy as np
 import math
@@ -23,11 +23,11 @@ eye_distance = 286500 #Distance of the eye from the sun in meters https://www.re
 sunBodyIndex = 0 #Index that is the Sun in the Bodies list
 NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
 n_sim_per_pikmin = 250 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
-total_n_pikmin_to_make = 400 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin will run n_sim_per_pikmin simulations
+total_n_pikmin_to_make = 800 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin will run n_sim_per_pikmin simulations
 pikmin_on_field = None #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
-Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
+Mass_Simulation_Mode = False #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
-plotPath = False #Whether to plot or not
+plotPath = True #Whether to plot or not
 
 class Body:
     def __init__(self,timeandpos,propertiesDataframe = None):
@@ -286,6 +286,9 @@ def calculateDrag(relativeFluidVelocity,fluidDensity:float,dt):
     dragmagintude = 0.5*fluidDensity*(advectionmagnitude)**2*0.00392*dt
     a = min(advectionmagnitude,dragmagintude)
     return a*relativeFluidVelocity/advectionmagnitude
+def calculateDragTest():
+    #Zero relative velocity test
+    print(f"Zero relative velocity test: {calculateDrag(np.array([0,0,0]),1,1)}")
 def calculateSunRadius(t):
     if t < 10*60:
         return 2000
@@ -294,11 +297,13 @@ def calculateSunRadius(t):
     else:
         return 4000
 def random_3d_unit_vector():
-    z= np.random.uniform(-1,1) #Change to -1,1
-    phi = np.random.uniform(0,2*np.pi)
-    r = np.sqrt(1-z**2)
-    x = r*np.cos(phi)
-    y = r*np.sin(phi)
+    phi = np.random.uniform(0,np.pi*2)
+    costheta = np.random.uniform(-1,1)
+
+    theta = np.arccos( costheta )
+    x = np.sin( theta) * np.cos( phi )
+    y = np.sin( theta) * np.sin( phi )
+    z = np.cos( theta )
     return np.array([x,y,z]) 
 def cartToSpherical(coordinates:np.array): #Convert cartesian coordinates to spherical in radial, azimuthal, polar coordinates https://mathworld.wolfram.com/SphericalCoordinates.html
     coordinates = np.asarray(coordinates)
@@ -448,7 +453,7 @@ else:
     else:
         print("Using In-Game gravity")
     ## Probe settings
-    unitvec = random_3d_unit_vector()
+    unitvec = [0.066543, 0.997782, 0.001502]#random_3d_unit_vector()
     print(unitvec)
     mag = 500
     print(mag)
