@@ -1,4 +1,7 @@
 import numpy as np
+import time
+from datetime import datetime
+
 
 vcannon = np.asarray([271.92222,0,122.0461])
 vprobe1 = np.asarray([224.1179,92.7537,647.428])
@@ -23,3 +26,7 @@ print(np.linalg.norm(vprobe2))
 print(np.linalg.norm(vprobe3))
 print(np.linalg.norm(vprobe4))
 print(np.linalg.norm(vprobe5))
+
+print(time.time())
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+print(timestamp)
