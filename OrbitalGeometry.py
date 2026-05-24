@@ -370,7 +370,7 @@ class StrangerMotion(planet): #This is just for the stranger, which based on my 
         z = np.zeros(points)
         for i in range(points):
             time = a[i]
-            if time < departtime:
+            if time < departtime: #stranger has 0 initial velocity in both cases which is why there is no velocity term in the else statement
                 x[i] = self.Foci.x
                 y[i] = self.Foci.y
                 z[i] = self.Foci.z

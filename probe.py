@@ -23,7 +23,7 @@ eye_distance = 286500 #Distance of the eye from the sun in meters https://www.re
 sunBodyIndex = 0 #Index that is the Sun in the Bodies list
 NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
 n_sim_per_pikmin = 250 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
-total_n_pikmin_to_make = 3680 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin will run n_sim_per_pikmin simulations
+total_n_pikmin_to_make = 400 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin will run n_sim_per_pikmin simulations
 pikmin_on_field = None #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
 Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
@@ -180,10 +180,11 @@ class probe:
         return [vx,acc[0],vy,acc[1],vz,acc[2]]
     def runSimulation(self,printoutput:bool=False):
         initXYZ = self.launchbody.getXYZ(self.launchtime)
+        if len(self.events) == 0:
         # Setting up events
-        self.events = [self.make_visit_event(body) for body in self.Bodies] #Make visiting events
-        self.events.append(self.make_eyeDistance_event()) #Add event for reaching the distance that the eye is from the Sun
-        self.events.append(self.make_hitBody_event()) #Add hitting event
+            self.events = [self.make_visit_event(body) for body in self.Bodies] #Make visiting events
+            self.events.append(self.make_eyeDistance_event()) #Add event for reaching the distance that the eye is from the Sun
+            self.events.append(self.make_hitBody_event()) #Add hitting event
         if printoutput:
             print("Running simulation...")
         self.path = solve_ivp(self.dSdt, [self.launchtime,(self.endtime)*60],y0 = [initXYZ[0],self.initialvel[0],initXYZ[1],self.initialvel[1],initXYZ[2],self.initialvel[2]],t_eval=np.arange(0,(self.endtime)*60,self.timestep),events=self.events)
@@ -344,13 +345,13 @@ def simulationPikmin(cannonIndex:int,launchMag:float,bodiesList:list[Body],launc
     if printoutput: 
         print(f"[{mp.current_process().name}] Starting simulation with {n_sims} runs...")
     results = makeResultsTemplate(n_sims) 
-    pikmin = probe(cannonIndex,launchMag,bodiesList,launchUnitVector,launchTime,timestep,endtime)
+    pikmin = probe(launchbodyindex=cannonIndex,launchvel=launchMag,Bodies=bodiesList,launchunitvector=launchUnitVector,launchtime=launchTime,endtime=endtime,timestep=timestep)
     for i in range(n_sims):
         #How to change the simulation each run
         newUnitVector = random_3d_unit_vector()
         pikmin.ChangeLaunchConditions(cannonIndex,launchMag,newUnitVector,launchTime)
         #Run the simulation
-        pikmin.runSimulation()
+        pikmin.runSimulation(False)
         results[i] = pikmin.Results()
     if printoutput: 
         print(f"[{mp.current_process().name}] Simulation took {time.time() - starttime} seconds.")
@@ -369,7 +370,9 @@ if Mass_Simulation_Mode:
         #Making this a global variable is a bit messed up but whatever
         Names = []
         for i in range(0,len(files)): #Load in bodies
-            Bodies.append(Body(np.load(files[i]),Properties.iloc[i]))
+            xyzarray = np.load(files[i])
+            xyzarray.flags.writeable = False #Make the array read-only to prevent accidental modification
+            Bodies.append(Body(xyzarray,Properties.iloc[i]))
             Names.append(Bodies[i].name)
             if Bodies[i].name == "Cannon":
                 CannonIndex = i
@@ -447,13 +450,14 @@ else:
     ## Probe settings
     unitvec = random_3d_unit_vector()
     print(unitvec)
-    mag = 100
+    mag = 500
     print(mag)
 
     ## Probe Simulation
     Test = probe(CannonIndex,mag,Bodies,np.asarray(unitvec),0,timestep=1/60,endtime=22)
     Test.runSimulation()
     Test.printSimulationEvents()
+    print(Test.Results())
 ## Plotting
     if plotPath:
     # Get Cartesian mesh grid
