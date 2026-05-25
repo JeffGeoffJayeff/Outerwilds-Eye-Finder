@@ -25,9 +25,9 @@ NormalGravityforAll = True #This controls whether gravity is calculated using Ne
 n_sim_per_pikmin = 250 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
 total_n_pikmin_to_make = 800 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin will run n_sim_per_pikmin simulations
 pikmin_on_field = None #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
-Mass_Simulation_Mode = False #Whether or not you are simulating one or multiple launches
+Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
-plotPath = True #Whether to plot or not
+plotPath = False #Whether to plot or not
 
 class Body:
     def __init__(self,timeandpos,propertiesDataframe = None):
@@ -128,13 +128,13 @@ class probe:
                 relativefluidvel = fluidvelocity - shipvel
                 if np.isnan(body.has_water): #Don't do anything about water if it doesn't have any
                     #Calculate air drag
-                    a += calculateDrag(relativefluidvel,body.air_density,self.timestep)
+                    a += calculateDrag(relativefluidvel,body.air_density)
                 elif (body.water_radius > dist):
                     #Do water drag instead, the 30 is because water is defined to be 30
-                    a += calculateDrag(relativefluidvel,30,self.timestep)
+                    a += calculateDrag(relativefluidvel,30)
                 else:
                     #Do air drag
-                    a += calculateDrag(relativefluidvel,body.air_density,self.timestep)
+                    a += calculateDrag(relativefluidvel,body.air_density)
         return a   
     def make_hitBody_event(self):            
         def hitBody(t,S):
@@ -281,14 +281,36 @@ class probe:
             return self.path.t_events[len(self.Bodies)+1][0]
         else: #Didn't hit anything
             return np.nan 
-def calculateDrag(relativeFluidVelocity,fluidDensity:float,dt):
+def calculateDrag(relativeFluidVelocity,fluidDensity:float):
     advectionmagnitude = np.linalg.norm(relativeFluidVelocity)
-    dragmagintude = 0.5*fluidDensity*(advectionmagnitude)**2*0.00392*dt
-    a = min(advectionmagnitude,dragmagintude)
-    return a*relativeFluidVelocity/advectionmagnitude
+    if advectionmagnitude < 1e-12: #If the relative fluid velocity is too small, then we can just return 0 drag
+        return np.array([0,0,0])
+    dragmagnitude = 0.5*fluidDensity*(advectionmagnitude)*0.00392 #originally advection magnitude was squared but since when we return the vector we divide by the magnitude to get the unit vector, we can just use the magnitude instead of the squared magnitude
+    return dragmagnitude*relativeFluidVelocity 
 def calculateDragTest():
     #Zero relative velocity test
-    print(f"Zero relative velocity test: {calculateDrag(np.array([0,0,0]),1,1)}")
+    print(f"Zero relative velocity test: {calculateDrag(np.array([0,0,0]),1)}")
+    #Direction test
+    v = np.array([10,0,0])
+    a = calculateDrag(v,1)
+    print(f"Direction test: {a}, should be in the same direction as {v} : {np.dot(a,v) < 0}")
+    #Scaling test
+    v1 = np.array([1,0,0])
+    v2 = np.array([2,0,0])
+    v3 = np.array([3,0,0])
+    print(f"Scaling test: {calculateDrag(v1,1)}, {calculateDrag(v2,1)}, {calculateDrag(v3,1)}")
+    #Extreme test
+    v = np.array([1e6,0,0])
+    print(f"Extreme test: {calculateDrag(v,1)}")
+    #Symmetry test
+    v = np.array([1,1,1])
+    print(f"Symmetry test: {-calculateDrag(v,1)}, {calculateDrag(-v,1)}")
+    #Rotation invariance test
+    v1 = np.array([1,0,0])
+    v2 = np.array([0,1,0])
+    v3 = np.array([0,0,1])
+    v4 = np.array([0.707,0.707,0])
+    print(f"Rotation invariance test: {calculateDrag(v1,1)}, {calculateDrag(v2,1)}, {calculateDrag(v3,1)}, {calculateDrag(v4,1)} | Should have equal magnitudes")
 def calculateSunRadius(t):
     if t < 10*60:
         return 2000
@@ -340,6 +362,7 @@ def makeResultsTemplate(length:int):
             ("White Hole Visits", np.int16),
             ("Stranger Visits", np.int16),
             ("Random Eye Visits", np.int16),
+            ("Spacey Visits", np.int16),
             ("Hit Something", np.bool_), #Whether or not the probe hit something
             ("Body Hit", np.float16) #index of whatever body it hit
         ]
@@ -457,7 +480,7 @@ else:
     print(unitvec)
     mag = 500
     print(mag)
-
+    calculateDragTest()
     ## Probe Simulation
     Test = probe(CannonIndex,mag,Bodies,np.asarray(unitvec),0,timestep=1/60,endtime=22)
     Test.runSimulation()
@@ -474,7 +497,7 @@ else:
         probepath = np.zeros((len(Test.path.t),4))
         probepath[:,0] = Test.path.t
         probepath[:,1:4] = Test.path.y[[0,2,4],:].T
-        print(f"Time: {Test.path.t_events[15]}, Cartesian Coordinates: {Test.getXYZ(Test.path.t_events[15][0])}, Spherical {cartToSpherical(Test.getXYZ(Test.path.t_events[15][0]))}")
+        print(f"Time: {Test.path.t_events[15]}, Cartesian Coordinates: {Test.getXYZ(Test.eyeArrivalTime)}, Spherical {cartToSpherical(Test.getXYZ(Test.eyeArrivalTime))}")
         range = [-800000,800000]
         step = 60*1 #Step in stepsizes
         fig = px.scatter_3d(x=probepath[:,1][::step],y=probepath[:,2][::step],z=probepath[:,3][::step],animation_frame=probepath[:,0][::step],range_x=range,range_y=range,range_z=range) #

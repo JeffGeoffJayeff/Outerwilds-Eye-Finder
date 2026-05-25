@@ -15,10 +15,10 @@ G = 1*10**(-3) #Gravitational Constant
 sun_mass = 4*10**11
 sun_radius = 2000
 ### Config Stuff
-Stepsize = 1 #In seconds
-EndMinute = 22 #Timeloop ends at 22:40 in the games, in minutes btw
-graphresults = True #Make a graph of the planet positions? (Doesn't do well with lots of points)
-Savemotion = False #Save the position of all bodies to file?
+Stepsize = 1/60 #In seconds
+EndMinute = 23 #Timeloop ends at 22:40 in the games, in minutes btw
+graphresults = False #Make a graph of the planet positions? (Doesn't do well with lots of points)
+Savemotion = True #Save the position of all bodies to file?
 Path = True #Shows the trajectory of probe path
 BodyPaths =  True #graphresults #Whether to show the path of the bodies in the system or not
 
@@ -143,6 +143,12 @@ RingWorld.visit_radius = 800
 
 TheEye = OG.planet(286500,0,sun_mass,foci=OG.point(init_pos=[0,0,0]),name="The Eye",parent=Sun,mass = 9*10**6,i=1.463537779,omega=-0.4321431)
 TheEye.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
+
+Spacey = OG.planet(26000,0,sun_mass,foci=OG.point(init_pos=[0,0,0]),name="Deep Space Satelitte",parent=Sun,mass=100,i=math.pi/2)
+Spacey.AscendNodeLong = math.pi*2 - 6.0175
+Spacey.InitialMeanAnomaly = -0.1685
+Spacey.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
+Spacey.visit_radius = 500
 #All bodies to be displayed/saved
 BodiesList = [Sun,
               SunStation, 
@@ -158,7 +164,9 @@ BodiesList = [Sun,
               Interloper,
               WhiteHole,
               RingWorld,
-              TheEye]
+              TheEye,
+              Spacey]
+
 if Savemotion:
     numofbody = len(BodiesList)
     for i in range(numofbody):
@@ -207,7 +215,8 @@ if graphresults:
         WhiteHole.name: "#D3D3D3",
         RingWorld.name: "#22a185",
         "Probe":"#FF8C00",
-        TheEye.name: "#8673A1"
+        TheEye.name: "#8673A1",
+        Spacey.name: "#00FF6A"
     }
     if Path:
         step = Stepsize*24
