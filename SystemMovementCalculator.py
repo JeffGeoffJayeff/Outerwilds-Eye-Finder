@@ -15,10 +15,10 @@ G = 1*10**(-3) #Gravitational Constant
 sun_mass = 4*10**11
 sun_radius = 2000
 ### Config Stuff
-Stepsize = 1/60 #In seconds
-EndMinute = 23 #Timeloop ends at 22:40 in the games, in minutes btw
-graphresults = False #Make a graph of the planet positions? (Doesn't do well with lots of points)
-Savemotion = True #Save the position of all bodies to file?
+Stepsize = 1 #In seconds
+EndMinute = 22 #Timeloop ends at 22:40 in the games, in minutes btw
+graphresults = True #Make a graph of the planet positions? (Doesn't do well with lots of points)
+Savemotion = False #Save the position of all bodies to file?
 Path = True #Shows the trajectory of probe path
 BodyPaths =  True #graphresults #Whether to show the path of the bodies in the system or not
 
@@ -166,7 +166,7 @@ BodiesList = [Sun,
               RingWorld,
               TheEye,
               Spacey]
-
+BodiesList = [Sun,CaveTwin,TowerTwin,TimberHearth,BrittleHollow,GiantsDeep,DarkBramble,Interloper]
 if Savemotion:
     numofbody = len(BodiesList)
     for i in range(numofbody):
@@ -219,7 +219,7 @@ if graphresults:
         Spacey.name: "#00FF6A"
     }
     if Path:
-        step = Stepsize*24
+        step = 60
         path = np.load("probepath.npy")[::int(step)]
         probeDF = pd.DataFrame({
             "time":path[:,0],

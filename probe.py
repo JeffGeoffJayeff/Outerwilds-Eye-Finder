@@ -27,7 +27,7 @@ total_n_pikmin_to_make = 800 #Total number of pikmin to make, this is the total 
 pikmin_on_field = None #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
 Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
-plotPath = False #Whether to plot or not
+plotPath = True #Whether to plot or not
 
 class Body:
     def __init__(self,timeandpos,propertiesDataframe = None):
@@ -315,7 +315,7 @@ def calculateSunRadius(t):
     if t < 10*60:
         return 2000
     elif ((10*60 <= t) and (t<19*60)): #Sun goes from radius of 2000 to 4000 over 9 minutes, assuming linear growth
-        return 7.407407*t-2444.4442
+        return 3.33333*t+200
     else:
         return 4000
 def random_3d_unit_vector():
@@ -476,11 +476,11 @@ else:
     else:
         print("Using In-Game gravity")
     ## Probe settings
-    unitvec = [0.066543, 0.997782, 0.001502]#random_3d_unit_vector()
+    unitvec = [0.995459,-0.071367,0.064554]#random_3d_unit_vector()
     print(unitvec)
     mag = 500
     print(mag)
-    calculateDragTest()
+    #calculateDragTest()
     ## Probe Simulation
     Test = probe(CannonIndex,mag,Bodies,np.asarray(unitvec),0,timestep=1/60,endtime=22)
     Test.runSimulation()
@@ -497,7 +497,8 @@ else:
         probepath = np.zeros((len(Test.path.t),4))
         probepath[:,0] = Test.path.t
         probepath[:,1:4] = Test.path.y[[0,2,4],:].T
-        print(f"Time: {Test.path.t_events[15]}, Cartesian Coordinates: {Test.getXYZ(Test.eyeArrivalTime)}, Spherical {cartToSpherical(Test.getXYZ(Test.eyeArrivalTime))}")
+        if not np.isnan(Test.eyeArrivalTime):
+            print(f"Time: {Test.path.t_events[15]}, Cartesian Coordinates: {Test.getXYZ(Test.eyeArrivalTime)}, Spherical {cartToSpherical(Test.getXYZ(Test.eyeArrivalTime))}")
         range = [-800000,800000]
         step = 60*1 #Step in stepsizes
         fig = px.scatter_3d(x=probepath[:,1][::step],y=probepath[:,2][::step],z=probepath[:,3][::step],animation_frame=probepath[:,0][::step],range_x=range,range_y=range,range_z=range) #

@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import os
 from pathlib import Path
+import plotly.express as px
+import plotly.graph_objects as go
+import pandas as pd
 
 def load_npy_files(folder_path):
     """Load all npy files from a folder and return combined data."""
@@ -69,7 +72,8 @@ def analyze_probe_visits(data):
         'Interloper Visits',
         'White Hole Visits',
         'Stranger Visits',
-        'Random Eye Visits'
+        'Random Eye Visits',
+        'Spacey Visits'
     ]
     
     # Print total visits for each body
@@ -102,7 +106,7 @@ def analyze_probe_visits(data):
             if probe[field] > 0:
                 bodies_visited += 1
         
-        if bodies_visited > 1:
+        if bodies_visited > 2:
             multi_visit_probes.append((idx, probe, bodies_visited))
     
     print(f"\nFound {len(multi_visit_probes)} probes that visited multiple bodies\n")
@@ -129,11 +133,11 @@ def analyze_probe_visits(data):
                     body_name = field.replace(' Visits', '')
                     bodies_info.append(f"{body_name} ({visits})")
             
-            print(f"\nProbe {probe_idx}:")
-            print(f"  Bodies visited: {', '.join(bodies_info)}")
-            print(f"  Launch direction (x,y,z): ({launch_x:.6f}, {launch_y:.6f}, {launch_z:.6f})")
-            print(f"  Launch direction (polar, azimuth): ({polar:.6f}, {azimuth:.6f})")
-            print(f"  Launch velocity: {launch_vel:.6f}")
+            #print(f"\nProbe {probe_idx}:")
+            #print(f"  Bodies visited: {', '.join(bodies_info)}")
+            #print(f"  Launch direction (x,y,z): ({launch_x:.6f}, {launch_y:.6f}, {launch_z:.6f})")
+            #print(f"  Launch direction (polar, azimuth): ({polar:.6f}, {azimuth:.6f})")
+            #print(f"  Launch velocity: {launch_vel:.6f}")
     
     print("\n" + "=" * 70)
 
@@ -358,6 +362,145 @@ def plot_launch_directions_heatmap(data, x_field='Launch x', y_field='Launch y',
     plt.tight_layout()
     return fig, ax
 
+def plot_spherical_points(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth', radius=1.0):
+    """
+    Plot points in spherical coordinates on a 3D sphere.
+    
+    Args:
+        data: numpy structured array
+        polar_field: Field name for polar angle
+        azimuth_field: Field name for azimuth angle
+        radius: Radius of the sphere (default 1.0)
+    """
+    if data is None or len(data) == 0:
+        print("No data to plot")
+        return
+    
+    # Extract fields
+    polar = np.array(data[polar_field], dtype=float)
+    azimuth = np.array(data[azimuth_field], dtype=float)
+    t = np.array(data['Eye Shell Time'], dtype=float)  # Assuming there's a time field for color mapping
+    # Filter out NaN values
+    valid_mask = np.isfinite(polar) & np.isfinite(azimuth)
+    polar = polar[valid_mask]
+    azimuth = azimuth[valid_mask]
+    t = t[np.isfinite(t)]
+    
+    num_discarded = len(data) - len(polar)
+    if num_discarded > 0:
+        print(f"Discarded {num_discarded} points with NaN values")
+    print(f"Using {len(polar)} valid points")
+    
+    if len(polar) == 0:
+        print("No valid data points after filtering NaN values")
+        return
+    
+    # Convert spherical to Cartesian coordinates
+    x, y, z = spherical_to_cartesian(polar, azimuth, radius=radius)
+    df = pd.DataFrame({
+        'x': x,
+        'y': y,
+        'z': z,
+        't': t
+    })
+    fig = px.scatter_3d(df, x='x', y='y', z='z', opacity=1, color='t')
+    fig.update_scenes(aspectmode='cube')  # Making the axes be a cube
+    fig.update_traces(marker_size=2)
+    fig.show()
+
+def plot_launch_directions(data, x_field='Launch x', y_field='Launch y', z_field='Launch z', 
+                           body_hit_colors=None):
+    """
+    Plot launch directions in 3D Cartesian coordinates.
+    NaN points are colored discretely by 'Body Hit' index, valid points by 'Eye Shell Time' (continuous).
+    
+    Args:
+        data: numpy structured array
+        x_field: Field name for x component
+        y_field: Field name for y component
+        z_field: Field name for z component
+        body_hit_colors: Dictionary mapping Body Hit index to color name. 
+                        Example: {0: 'red', 1: 'blue', 2: 'green', 3: 'yellow'}
+                        If None, uses default Plotly colors.
+    """
+    if data is None or len(data) == 0:
+        print("No data to plot")
+        return
+    
+    # Extract Cartesian components
+    x = np.array(data[x_field], dtype=float)
+    y = np.array(data[y_field], dtype=float)
+    z = np.array(data[z_field], dtype=float)
+    t = np.array(data['Eye Shell Time'], dtype=float)
+    body_hit = np.array(data['Body Hit'], dtype=float)
+    
+    # Create mask for valid points
+    valid_mask = np.isfinite(x) & np.isfinite(y) & np.isfinite(z)
+    
+    num_nan = np.sum(np.isnan(t))
+    num_valid = np.sum(np.isfinite(t))
+    if num_nan > 0:
+        print(f"Found {num_nan} points with NaN values (will color by Body Hit)")
+    print(f"Using {num_valid} valid points (colored by Eye Shell Time)")
+    
+    # Create figure
+    fig = go.Figure()
+    
+    # Add valid points (colored by Eye Shell Time - continuous)
+    if num_valid > 0:
+        x_valid = x[np.isfinite(t)]
+        y_valid = y[np.isfinite(t)]
+        z_valid = z[np.isfinite(t)]
+        t_valid = t[np.isfinite(t)]
+        
+        fig.add_trace(go.Scatter3d(
+            x=x_valid, y=y_valid, z=z_valid,
+            mode='markers',
+            marker=dict(
+                size=2,
+                color=t_valid,
+                colorscale='Viridis',
+                showscale=True,
+                colorbar=dict(title="Eye Shell Time", x=1.1)
+            ),
+            name='Valid Points',
+            opacity=1
+        ))
+    
+    # Add NaN points (colored by Body Hit - discrete)
+    if num_nan > 0:
+        x_nan = x[np.isnan(t)]
+        y_nan = y[np.isnan(t)]
+        z_nan = z[np.isnan(t)]
+        body_hit_nan = body_hit[np.isnan(t)]
+        
+        # Map Body Hit indices to color names
+        if body_hit_colors is None:
+            # Default color sequence
+            color_palette = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+            # Get unique non-NaN values
+            unique_body_hits = np.unique(body_hit_nan[~np.isnan(body_hit_nan)])
+            body_hit_colors = {int(i): color_palette[idx % len(color_palette)] 
+                              for idx, i in enumerate(unique_body_hits)}
+        
+        # Group NaN points by Body Hit index for better legend
+        unique_indices = np.unique(body_hit_nan[~np.isnan(body_hit_nan)])
+        for body_hit_idx in unique_indices:
+            mask = body_hit_nan == body_hit_idx
+            fig.add_trace(go.Scatter3d(
+                x=x_nan[mask], y=y_nan[mask], z=z_nan[mask],
+                mode='markers',
+                marker=dict(
+                    size=2,
+                    color=body_hit_colors.get(int(body_hit_idx), 'gray')
+                ),
+                name=f'{int(body_hit_idx)}',
+                opacity=1
+            ))
+    
+    fig.update_layout(scene=dict(aspectmode='cube'))
+    fig.show()
+
 def main():
     """Main execution function."""
     outputs_folder = Path("Outputs")
@@ -380,39 +523,64 @@ def main():
         num_points = len(data)
         bins = min(100, max(30, int(np.sqrt(num_points / 100))))
         print(f"\nAuto-selecting {bins} bins for {num_points} points\n")
-        
+        if False:
         # Plot 1: Eye Shell position heatmap
-        print("=" * 60)
-        print("PLOT 1: Eye Shell Position Heatmap")
-        print("=" * 60)
-        fig1, ax1 = plot_spherical_heatmap(data, 
-                                           polar_field='Eye Shell Polar', 
-                                           azimuth_field='Eye Shell Azimuth', 
-                                           radius=1.0,
-                                           bins=bins)
+            print("=" * 60)
+            print("PLOT 1: Eye Shell Position Heatmap")
+            print("=" * 60)
+            fig1, ax1 = plot_spherical_heatmap(data, 
+                                            polar_field='Eye Shell Polar', 
+                                            azimuth_field='Eye Shell Azimuth', 
+                                            radius=1.0,
+                                            bins=bins)
+            
+            # Save figure
+            output_file1 = "spherical_heatmap_eye_shell.png"
+            plt.savefig(output_file1, dpi=150, bbox_inches='tight')
+            print(f"Plot saved to {output_file1}\n")
+        if False:
+            # Plot 2: Launch directions heatmap
+            print("=" * 60)
+            print("PLOT 2: Launch Directions Heatmap")
+            print("=" * 60)
+            fig2, ax2 = plot_launch_directions_heatmap(data,
+                                                    x_field='Launch x',
+                                                    y_field='Launch y',
+                                                    z_field='Launch z',
+                                                    radius=1.0,
+                                                    bins=bins)
+            
+            # Save figure
+            output_file2 = "spherical_heatmap_launch_directions.png"
+            plt.savefig(output_file2, dpi=150, bbox_inches='tight')
+            print(f"Plot saved to {output_file2}\n")
+            
+            plt.show()
+
+        plot_spherical_points(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth', radius=286500)
         
-        # Save figure
-        output_file1 = "spherical_heatmap_eye_shell.png"
-        plt.savefig(output_file1, dpi=150, bbox_inches='tight')
-        print(f"Plot saved to {output_file1}\n")
-        
-        # Plot 2: Launch directions heatmap
-        print("=" * 60)
-        print("PLOT 2: Launch Directions Heatmap")
-        print("=" * 60)
-        fig2, ax2 = plot_launch_directions_heatmap(data,
-                                                   x_field='Launch x',
-                                                   y_field='Launch y',
-                                                   z_field='Launch z',
-                                                   radius=1.0,
-                                                   bins=bins)
-        
-        # Save figure
-        output_file2 = "spherical_heatmap_launch_directions.png"
-        plt.savefig(output_file2, dpi=150, bbox_inches='tight')
-        print(f"Plot saved to {output_file2}\n")
-        
-        plt.show()
+        # Define custom colors for Body Hit indices (NaN points only)
+        colormap = {
+            0:"#FFDF22",
+            1:"#9D00FF",
+            2:"#D3D3D3",
+            3:"#f05f44",
+            4:"#e19d49",
+            5: "#5a8240",
+            6: "#8e7263",
+            7: "#647297",
+            8: "#d86f23",
+            9: "#31a174",
+            10:"#676e4c",
+            11: "#55503a",
+            12: "#349fb9",
+            13: "#D3D3D3",
+            14: "#22a185",
+            15: "#8673A1",
+            16: "#00FF6A"
+        }
+        plot_launch_directions(data, x_field='Launch x', y_field='Launch y', z_field='Launch z',
+                              body_hit_colors=colormap)
     else:
         print("No data was loaded.")
 
