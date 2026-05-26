@@ -23,7 +23,7 @@ eye_distance = 286500 #Distance of the eye from the sun in meters https://www.re
 sunBodyIndex = 0 #Index that is the Sun in the Bodies list
 NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
 n_sim_per_pikmin = 250 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
-total_n_pikmin_to_make = 800 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin will run n_sim_per_pikmin simulations
+total_n_pikmin_to_make = 6400 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin will run n_sim_per_pikmin simulations
 pikmin_on_field = None #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
 Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
@@ -236,6 +236,9 @@ class probe:
             output.append(self.closestObjectIndex(self.hitTime))
         else:
             output.append(np.nan)
+        finalcartcoords = self.getXYZ(self.path.t[-1])
+        finalcoords = cartToSpherical(finalcartcoords)
+        output.extend([finalcoords[1],finalcoords[2],finalcoords[0]]) #Final polar, azimuth, radius
         return tuple(output)
     def closestObjectIndex(self,time:float):
         distances = np.zeros(len(self.Bodies))
@@ -281,6 +284,13 @@ class probe:
             return self.path.t_events[len(self.Bodies)+1][0]
         else: #Didn't hit anything
             return np.nan 
+    @property
+    def finalSunDistance(self):
+        if self.path == None:
+            print("ERROR: 004 Simulate the probe first")
+            return np.nan
+        else:
+            return np.linalg.norm(self.Bodies[sunBodyIndex].getXYZ(self.path.t[-1]) - self.getXYZ(self.path.t[-1]))
 def calculateDrag(relativeFluidVelocity,fluidDensity:float):
     advectionmagnitude = np.linalg.norm(relativeFluidVelocity)
     if advectionmagnitude < 1e-12: #If the relative fluid velocity is too small, then we can just return 0 drag
@@ -319,10 +329,8 @@ def calculateSunRadius(t):
     else:
         return 4000
 def random_3d_unit_vector():
-    phi = np.random.uniform(0,np.pi*2)
-    costheta = np.random.uniform(-1,1)
-
-    theta = np.arccos( costheta )
+    phi = np.random.uniform(0,np.pi*2) #np.random.uniform(5.463,6.283+0.154)% (np.pi*2) #
+    theta = np.random.uniform(0,np.pi) # np.random.uniform(1.183,1.958)
     x = np.sin( theta) * np.cos( phi )
     y = np.sin( theta) * np.sin( phi )
     z = np.cos( theta )
@@ -364,7 +372,10 @@ def makeResultsTemplate(length:int):
             ("Random Eye Visits", np.int16),
             ("Spacey Visits", np.int16),
             ("Hit Something", np.bool_), #Whether or not the probe hit something
-            ("Body Hit", np.float16) #index of whatever body it hit
+            ("Body Hit", np.float16), #index of whatever body it hit
+            ("Final Polar",np.float32), #Final point of probe
+            ("Final Azimuth",np.float32),
+            ("Final Radius", np.float32)
         ]
     )
     return resultsTemplate
@@ -387,7 +398,7 @@ def simulationPikmin(cannonIndex:int,launchMag:float,bodiesList:list[Body],launc
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     filename = f"{outputdir}/results_{timestamp}"
     np.save(f"{filename}.npy",results)
-    np.savetxt(f"{filename}.csv",results,delimiter=",")
+    #np.savetxt(f"{filename}.csv",results,delimiter=",")
     return 
 
 if Mass_Simulation_Mode:
@@ -427,7 +438,7 @@ if Mass_Simulation_Mode:
         else:
             print("Using In-Game gravity")
 
-        outputdir = "Outputs"
+        outputdir = "OutputsWithDistance"
         Path(outputdir).mkdir(parents=True, exist_ok=True)
 
         print(f"Starting {total_n_pikmin_to_make} pikmin with {n_sim_per_pikmin} runs each...")

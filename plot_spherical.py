@@ -12,6 +12,8 @@ from pathlib import Path
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
+import datashader as ds
+import datashader.transfer_functions as tf
 
 def load_npy_files(folder_path):
     """Load all npy files from a folder and return combined data."""
@@ -23,7 +25,7 @@ def load_npy_files(folder_path):
     
     all_data = []
     for npy_file in npy_files:
-        print(f"Loading {npy_file.name}...")
+        #print(f"Loading {npy_file.name}...")
         data = np.load(npy_file)
         #print(f"  Shape: {data.shape}, dtype: {data.dtype}")
         
@@ -153,9 +155,9 @@ def spherical_to_cartesian(polar, azimuth, radius=1.0):
     Returns:
         x, y, z coordinates
     """
-    x = radius * np.sin(polar) * np.cos(azimuth)
+    x = radius * np.cos(polar) * np.sin(azimuth)
     y = radius * np.sin(polar) * np.sin(azimuth)
-    z = radius * np.cos(polar)
+    z = radius * np.cos(azimuth)
     return x, y, z
 
 def cartesian_to_spherical(x, y, z):
@@ -362,7 +364,14 @@ def plot_launch_directions_heatmap(data, x_field='Launch x', y_field='Launch y',
     plt.tight_layout()
     return fig, ax
 
-def plot_spherical_points(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth', radius=1.0):
+def plot_spherical_points(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth', radius=1.0, range=100000):
+    # Get Cartesian mesh grid
+    sun_radius = 1000
+    spherephi, spheretheta = np.mgrid[0.0:np.pi:20j, 0.0:2.0 * np.pi:20j] #Change the 20j to somethingelsej if you want different resolution on the sphere
+    spherex = sun_radius*np.sin(spherephi) * np.cos(spheretheta) + 3421.723
+    spherey = sun_radius*np.sin(spherephi) * np.sin(spheretheta) - 16097.95
+    spherez = sun_radius*np.cos(spherephi)
+
     """
     Plot points in spherical coordinates on a 3D sphere.
     
@@ -380,11 +389,12 @@ def plot_spherical_points(data, polar_field='Eye Shell Polar', azimuth_field='Ey
     polar = np.array(data[polar_field], dtype=float)
     azimuth = np.array(data[azimuth_field], dtype=float)
     t = np.array(data['Eye Shell Time'], dtype=float)  # Assuming there's a time field for color mapping
-    # Filter out NaN values
-    valid_mask = np.isfinite(polar) & np.isfinite(azimuth)
+
+    # Filter out NaN values in all relevant fields together
+    valid_mask = np.isfinite(polar) & np.isfinite(azimuth) & np.isfinite(t)
     polar = polar[valid_mask]
     azimuth = azimuth[valid_mask]
-    t = t[np.isfinite(t)]
+    t = t[valid_mask]
     
     num_discarded = len(data) - len(polar)
     if num_discarded > 0:
@@ -397,19 +407,85 @@ def plot_spherical_points(data, polar_field='Eye Shell Polar', azimuth_field='Ey
     
     # Convert spherical to Cartesian coordinates
     x, y, z = spherical_to_cartesian(polar, azimuth, radius=radius)
-    df = pd.DataFrame({
-        'x': x,
-        'y': y,
-        'z': z,
-        't': t
+    limit = range
+    arr = np.zeros(len(x), dtype=bool)
+    #arr[:limit] = True
+    np.random.shuffle(arr)
+    arr[:] = True
+    df = pd.DataFrame({ #Take random samples 
+        'x': x[arr],
+        'y': y[arr],
+        'z': z[arr],
+        't': t[arr]
     })
-    fig = px.scatter_3d(df, x='x', y='y', z='z', opacity=1, color='t')
+    print(np.sum(np.isnan(df['x'])))
+    print(np.sum(np.isnan(df['y'])))
+    print(np.sum(np.isnan(df['z'])))
+    print(np.sum(np.isnan(df['t'])))
+    fig = px.scatter_3d(df, x='x', y='y', z='z', color='t')
     fig.update_scenes(aspectmode='cube')  # Making the axes be a cube
     fig.update_traces(marker_size=2)
+    fig.add_surface(x=spherex, y=spherey, z=spherez, opacity=1.0,showscale=False)
     fig.show()
 
+def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth', radius='Final Sun Distance', range=100000):
+    # Get Cartesian mesh grid for Giant's Deep
+    GD_radius = 1000
+    sun_radius = 2000
+    spherephi, spheretheta = np.mgrid[0.0:np.pi:20j, 0.0:2.0 * np.pi:20j] #Change the 20j to somethingelsej if you want different resolution on the sphere
+    GDx = GD_radius*np.sin(spherephi) * np.cos(spheretheta) + 3421.723
+    GDy = GD_radius*np.sin(spherephi) * np.sin(spheretheta) - 16097.95
+    GDz = GD_radius*np.cos(spherephi)
+
+    sunx = sun_radius*np.sin(spherephi) * np.cos(spheretheta)
+    suny = sun_radius*np.sin(spherephi) * np.sin(spheretheta)
+    sunz = sun_radius*np.cos(spherephi)
+    """
+    Plot points in spherical coordinates on a 3D sphere.
+    
+    Args:
+        data: numpy structured array
+        polar_field: Field name for polar angle
+        azimuth_field: Field name for azimuth angle
+        radius: Radius of the sphere (default 1.0)
+    """
+    if data is None or len(data) == 0:
+        print("No data to plot")
+        return
+    
+    # Extract fields
+    polar = np.array(data[polar_field], dtype=float)
+    azimuth = np.array(data[azimuth_field], dtype=float)
+    radius = np.array(data[radius], dtype=float)
+    t = np.array(data['Eye Shell Time'], dtype=float)  # Assuming there's a time field for color mapping
+    
+    # Convert spherical to Cartesian coordinates
+    x, y, z = spherical_to_cartesian(polar, azimuth, radius=radius)
+    limit = range
+    arr = np.zeros(len(x), dtype=bool)
+    arr[:limit] = True
+    np.random.shuffle(arr)
+    #arr[:] = True
+    df = pd.DataFrame({ #Take random samples 
+        'x': x[arr],
+        'y': y[arr],
+        'z': z[arr],
+        't': t[arr]
+    })
+    print(np.sum(np.isnan(df['x'])))
+    print(np.sum(np.isnan(df['y'])))
+    print(np.sum(np.isnan(df['z'])))
+    print(np.sum(np.isnan(df['t'])))
+    fig = px.scatter_3d(df, x='x', y='y', z='z', color='t')
+    fig.update_scenes(aspectmode='cube')  # Making the axes be a cube
+    fig.update_traces(marker_size=2)
+    fig.add_surface(x=GDx, y=GDy, z=GDz, opacity=1.0,showscale=False)
+    fig.add_surface(x=sunx, y=suny, z=sunz, opacity=1.0,showscale=False)
+    fig.show()
+
+
 def plot_launch_directions(data, x_field='Launch x', y_field='Launch y', z_field='Launch z', 
-                           body_hit_colors=None):
+                           body_hit_colors=None,limit=100000):
     """
     Plot launch directions in 3D Cartesian coordinates.
     NaN points are colored discretely by 'Body Hit' index, valid points by 'Eye Shell Time' (continuous).
@@ -426,14 +502,26 @@ def plot_launch_directions(data, x_field='Launch x', y_field='Launch y', z_field
     if data is None or len(data) == 0:
         print("No data to plot")
         return
-    
+    range = [-1,1]
     # Extract Cartesian components
     x = np.array(data[x_field], dtype=float)
     y = np.array(data[y_field], dtype=float)
     z = np.array(data[z_field], dtype=float)
     t = np.array(data['Eye Shell Time'], dtype=float)
-    body_hit = np.array(data['Body Hit'], dtype=float)
-    
+    body = np.array(data['Body Hit'], dtype=float)
+
+    arr = np.zeros(len(x), dtype=bool)
+    arr[:limit] = True
+    np.random.shuffle(arr)
+    #arr[:] = True
+    x = x[arr]
+    y = y[arr]
+    z = z[arr]
+    t = t[arr]
+    body = body[arr]
+
+    print(f"Total points: {len(x)} \n Hit Something {np.sum(np.isfinite(body))} \n Hit Nothing {np.sum(np.isnan(body) & np.isnan(t))} \n Hit Eye Shell {np.sum(np.isfinite(t))}")
+
     # Create mask for valid points
     valid_mask = np.isfinite(x) & np.isfinite(y) & np.isfinite(z)
     
@@ -445,7 +533,7 @@ def plot_launch_directions(data, x_field='Launch x', y_field='Launch y', z_field
     
     # Create figure
     fig = go.Figure()
-    
+
     # Add valid points (colored by Eye Shell Time - continuous)
     if num_valid > 0:
         x_valid = x[np.isfinite(t)]
@@ -461,49 +549,102 @@ def plot_launch_directions(data, x_field='Launch x', y_field='Launch y', z_field
                 color=t_valid,
                 colorscale='Viridis',
                 showscale=True,
-                colorbar=dict(title="Eye Shell Time", x=1.1)
+                colorbar=dict(title="Eye Shell Time", x=1.1),
             ),
             name='Valid Points',
             opacity=1
         ))
+    # Endless Orbit:
+    mask = np.isnan(t) & np.isnan(body)
+    x_orbit = x[mask]
+    y_orbit = y[mask]
+    z_orbit = z[mask]
+    fig.add_trace(go.Scatter3d(
+        x=x_orbit,
+        y=y_orbit,
+        z=z_orbit,
+        mode='markers',
+        name="Orbiter",
+        marker=dict(size=2, color='black'),
+        legendgroup='orbit',
+        showlegend=True,
+    ))
     
-    # Add NaN points (colored by Body Hit - discrete)
+    # Hit Bodies
     if num_nan > 0:
-        x_nan = x[np.isnan(t)]
-        y_nan = y[np.isnan(t)]
-        z_nan = z[np.isnan(t)]
-        body_hit_nan = body_hit[np.isnan(t)]
+        x_nan = x[np.isfinite(body)]
+        y_nan = y[np.isfinite(body)]
+        z_nan = z[np.isfinite(body)]
+        body_hit = body[np.isfinite(body)]
         
         # Map Body Hit indices to color names
         if body_hit_colors is None:
             # Default color sequence
             color_palette = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
             # Get unique non-NaN values
-            unique_body_hits = np.unique(body_hit_nan[~np.isnan(body_hit_nan)])
+            unique_body_hits = np.unique(body_hit[~np.isnan(body_hit)])
             body_hit_colors = {int(i): color_palette[idx % len(color_palette)] 
                               for idx, i in enumerate(unique_body_hits)}
         
         # Group NaN points by Body Hit index for better legend
-        unique_indices = np.unique(body_hit_nan[~np.isnan(body_hit_nan)])
-        for body_hit_idx in unique_indices:
-            mask = body_hit_nan == body_hit_idx
+        df = pd.DataFrame({
+            'x': x_nan, 
+            'y': y_nan,
+            'z': z_nan,
+            'body': body_hit
+        })
+        for body, group in df.groupby('body'):
             fig.add_trace(go.Scatter3d(
-                x=x_nan[mask], y=y_nan[mask], z=z_nan[mask],
+                x=group['x'],
+                y=group['y'],
+                z=group['z'],
                 mode='markers',
-                marker=dict(
-                    size=2,
-                    color=body_hit_colors.get(int(body_hit_idx), 'gray')
-                ),
-                name=f'{int(body_hit_idx)}',
-                opacity=1
+                name=f"hit {body}",
+                marker=dict(size=2, color=body_hit_colors[body],opacity=0.5),
+                legendgroup=body,   # ties it to the same legend entry
+                showlegend=True,
             ))
-    
-    fig.update_layout(scene=dict(aspectmode='cube'))
+    # TODO: Add plotting for when something neither hits a body nor reaches the eye shell, which is common due to the probe getting stuck in an orbit
+    fig.update_layout(scene=dict(aspectmode='cube',xaxis=dict(range=range),yaxis=dict(range=range),zaxis=dict(range=range)))
     fig.show()
 
+def plot_2D_crash(data,polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth'):
+    canvas = ds.Canvas(plot_width=800*2, plot_height=400*2,x_range=(-np.pi,np.pi),y_range=(0,np.pi),x_axis_type='linear',y_axis_type='linear')
+    polar = np.array(data[polar_field], dtype=float)
+    azimuth = np.array(data[azimuth_field], dtype=float)
+    t = np.array(data['Eye Shell Time'], dtype=float)  # Assuming there's a time field for color mapping
+
+    # Filter out NaN values in all relevant fields together
+    valid_mask = np.isfinite(polar) & np.isfinite(azimuth) & np.isfinite(t)
+    polar = polar[valid_mask]
+    azimuth = azimuth[valid_mask]
+    t = t[valid_mask]
+    
+    num_discarded = len(data) - len(polar)
+    if num_discarded > 0:
+        print(f"Discarded {num_discarded} points with NaN values")
+    print(f"Using {len(polar)} valid points")
+    
+    if len(polar) == 0:
+        print("No valid data points after filtering NaN values")
+        return
+    
+    # Convert spherical to Cartesian coordinates
+    limit = 500000
+    df = pd.DataFrame({
+        'polar':polar,
+        'azi': azimuth,
+        't': t
+    })
+
+    agg = canvas.points(df, 'polar', 'azi', agg=ds.count())
+    ds.tf.set_background(ds.tf.shade(agg, cmap=plt.cm.viridis), "white").to_pil().save("2D_crash.png")
+
+
 def main():
+
     """Main execution function."""
-    outputs_folder = Path("Outputs")
+    outputs_folder = Path("OutputsWithDistance")
     
     if not outputs_folder.exists():
         print(f"Outputs folder not found at {outputs_folder.absolute()}")
@@ -557,30 +698,30 @@ def main():
             
             plt.show()
 
-        plot_spherical_points(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth', radius=286500)
+        plot_spherical_points(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth', radius=286500,range=400000)
         
         # Define custom colors for Body Hit indices (NaN points only)
         colormap = {
             0:"#FFDF22",
             1:"#9D00FF",
-            2:"#D3D3D3",
-            3:"#f05f44",
-            4:"#e19d49",
-            5: "#5a8240",
-            6: "#8e7263",
-            7: "#647297",
-            8: "#d86f23",
-            9: "#31a174",
-            10:"#676e4c",
-            11: "#55503a",
-            12: "#349fb9",
-            13: "#D3D3D3",
-            14: "#22a185",
-            15: "#8673A1",
-            16: "#00FF6A"
+            2:"#f05f44",
+            3:"#e19d49",
+            4: "#5a8240",
+            5: "#8e7263",
+            6: "#647297",
+            7: "#d86f23",
+            8: "#31a174",
+            9:"#676e4c",
+            10: "#55503a",
+            11: "#349fb9",
+            12: "#D3D3D3",
+            13: "#22a185",
+            14: "#8673A1",
+            15: "#00FF6A"
         }
-        plot_launch_directions(data, x_field='Launch x', y_field='Launch y', z_field='Launch z',
-                              body_hit_colors=colormap)
+        plot_launch_directions(data, x_field='Launch x', y_field='Launch y', z_field='Launch z',body_hit_colors=colormap,limit=400000)
+        plot_distance(data, polar_field='Final Polar', azimuth_field='Final Azimuth', radius='Final Radius', range=400000)
+        plot_2D_crash(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth')
     else:
         print("No data was loaded.")
 
