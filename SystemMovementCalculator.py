@@ -15,10 +15,10 @@ G = 1*10**(-3) #Gravitational Constant
 sun_mass = 4*10**11
 sun_radius = 2000
 ### Config Stuff
-Stepsize = 1 #In seconds
-EndMinute = 22 #Timeloop ends at 22:40 in the games, in minutes btw
-graphresults = True #Make a graph of the planet positions? (Doesn't do well with lots of points)
-Savemotion = False #Save the position of all bodies to file?
+Stepsize = 1/60 #In seconds
+EndMinute = 23 #Timeloop ends at 22:40 in the games, in minutes btw
+graphresults = False #Make a graph of the planet positions? (Doesn't do well with lots of points)
+Savemotion = True #Save the position of all bodies to file?
 Path = True #Shows the trajectory of probe path
 BodyPaths =  True #graphresults #Whether to show the path of the bodies in the system or not
 
@@ -142,7 +142,12 @@ RingWorld.surface_radius = 300
 RingWorld.visit_radius = 800
 
 TheEye = OG.planet(286500,0,sun_mass,foci=OG.point(init_pos=[0,0,0]),name="The Eye",parent=Sun,mass = 9*10**6,i=1.463537779,omega=-0.4321431)
+TheEye.isGravityLinear = True #Just gonna assume this is so 
+TheEye.mass = 9*10**6
+TheEye.InitialMeanAnomaly = 1.532 #Adding this because I think the eye just happened to be in the shadow of GD
 TheEye.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
+TheEye.surface_radius = 201
+TheEye.visit_radius = 2000 #I'm just eyeballing that this is how far the Owlk's blocker satellite orbits the eye from 
 
 Spacey = OG.planet(26000,0,sun_mass,foci=OG.point(init_pos=[0,0,0]),name="Deep Space Satelitte",parent=Sun,mass=100,i=math.pi/2)
 Spacey.AscendNodeLong = math.pi*2 - 6.0175
@@ -166,7 +171,7 @@ BodiesList = [Sun,
               RingWorld,
               TheEye,
               Spacey]
-BodiesList = [Sun,CaveTwin,TowerTwin,TimberHearth,BrittleHollow,GiantsDeep,DarkBramble,Interloper]
+#BodiesList = [Sun,CaveTwin,TowerTwin,TimberHearth,BrittleHollow,GiantsDeep,DarkBramble,Interloper,TheEye]
 if Savemotion:
     numofbody = len(BodiesList)
     for i in range(numofbody):

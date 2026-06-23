@@ -18,13 +18,14 @@ import multiprocessing as mp
 Properties = pd.read_pickle("Properties.pkl")
 bodiesfolder = Path("Bodies")
 files = list(bodiesfolder.glob("*.npy"))
+outputdir = "UniformDistEyeHasMass"
 G = 10**-3
 eye_distance = 286500 #Distance of the eye from the sun in meters https://www.reddit.com/r/outerwilds/comments/t7mxcy/how_far_away_is_the_eye_base_game_spoilers/
 sunBodyIndex = 0 #Index that is the Sun in the Bodies list
 NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
-n_sim_per_pikmin = 250 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
-total_n_pikmin_to_make = 6400 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin will run n_sim_per_pikmin simulations
-pikmin_on_field = None #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
+n_sim_per_pikmin = 1000 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
+total_n_pikmin_to_make = 500 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin  will run n_sim_per_pikmin simulations
+pikmin_on_field = 14 #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
 Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
 plotPath = True #Whether to plot or not
@@ -125,7 +126,7 @@ class probe:
                 continue
             elif (body.air_radius > dist): #Inside the atmosphere
                 fluidvelocity = body.getVel(t)
-                relativefluidvel = fluidvelocity - shipvel
+                relativefluidvel = shipvel - fluidvelocity
                 if np.isnan(body.has_water): #Don't do anything about water if it doesn't have any
                     #Calculate air drag
                     a += calculateDrag(relativefluidvel,body.air_density)
@@ -218,8 +219,10 @@ class probe:
     
     def Results(self):
         output = [] #23
-        output.extend(self.direction) #Adding Launch XYZ
-        output.append(self.launch_velocity_mag) #Adding launch velocity
+        output.extend(self.direction) #Adding Relative Launch unit XYZ
+        output.extend(self.initialvel/np.linalg.norm(self.initialvel)) #Adding Global Launch unit XYZ
+        output.append(self.launch_velocity_mag) #Adding Relative launch velocity
+        output.append(np.linalg.norm(self.initialvel)) #Adding Global launch velocity
         output.append(self.arrivedAtEye) #Eye Tracking stuff
         if self.arrivedAtEye: 
             output.append(self.eyeArrivalTime)
@@ -296,7 +299,7 @@ def calculateDrag(relativeFluidVelocity,fluidDensity:float):
     if advectionmagnitude < 1e-12: #If the relative fluid velocity is too small, then we can just return 0 drag
         return np.array([0,0,0])
     dragmagnitude = 0.5*fluidDensity*(advectionmagnitude)*0.00392 #originally advection magnitude was squared but since when we return the vector we divide by the magnitude to get the unit vector, we can just use the magnitude instead of the squared magnitude
-    return dragmagnitude*relativeFluidVelocity 
+    return -dragmagnitude*relativeFluidVelocity 
 def calculateDragTest():
     #Zero relative velocity test
     print(f"Zero relative velocity test: {calculateDrag(np.array([0,0,0]),1)}")
@@ -328,12 +331,19 @@ def calculateSunRadius(t):
         return 3.33333*t+200
     else:
         return 4000
-def random_3d_unit_vector():
-    phi = np.random.uniform(0,np.pi*2) #np.random.uniform(5.463,6.283+0.154)% (np.pi*2) #
-    theta = np.random.uniform(0,np.pi) # np.random.uniform(1.183,1.958)
-    x = np.sin( theta) * np.cos( phi )
-    y = np.sin( theta) * np.sin( phi )
-    z = np.cos( theta )
+def random_3d_unit_vector(): #https://mathworld.wolfram.com/SpherePointPicking.html
+    #phi = np.random.uniform(0,np.pi*2) #np.random.uniform(5.463,6.283+0.154)% (np.pi*2) #
+    #theta = np.random.uniform(0,np.pi) # np.random.uniform(1.183,1.958)
+    #x = np.sin( theta) * np.cos( phi )
+    #y = np.sin( theta) * np.sin( phi )
+    #z = np.cos( theta )
+    x = np.random.normal(0,1)
+    y = np.random.normal(0,1)
+    z = np.random.normal(0,1)
+    norm = np.sqrt(x**2 + y**2 + z**2)
+    x /= norm
+    y /= norm
+    z /= norm
     return np.array([x,y,z]) 
 def cartToSpherical(coordinates:np.array): #Convert cartesian coordinates to spherical in radial, azimuthal, polar coordinates https://mathworld.wolfram.com/SphericalCoordinates.html
     coordinates = np.asarray(coordinates)
@@ -347,14 +357,18 @@ def makeResultsTemplate(length:int):
     resultsTemplate = np.empty(
         length,
         dtype = [
-            ("Launch x",np.float64),
-            ("Launch y",np.float64),
-            ("Launch z",np.float64),
-            ("Launch Velocity",np.float32),
+            ("Relative Launch x",np.float64),
+            ("Relative Launch y",np.float64),
+            ("Relative Launch z",np.float64),
+            ("Global Launch x",np.float64),
+            ("Global Launch y",np.float64),
+            ("Global Launch z",np.float64),
+            ("Relative Launch Velocity",np.float32),
+            ("Global Launch Velocity",np.float32),
             ("Reached Eye",np.bool_),
             ("Eye Shell Time",np.float32), #The time the probe reaches 286 km or whatever it is
-            ("Eye Shell Polar",np.float32), #The polar of the above point
-            ("Eye Shell Azimuth",np.float32), #Azimuth of the above point
+            ("Eye Shell Polar",np.float64), #The polar of the above point
+            ("Eye Shell Azimuth",np.float64), #Azimuth of the above point
             ("Sun Visits",np.int16),
             ("Sun Station Visits",np.int16),
             ("Ember Twin Visits",np.int16),
@@ -373,9 +387,9 @@ def makeResultsTemplate(length:int):
             ("Spacey Visits", np.int16),
             ("Hit Something", np.bool_), #Whether or not the probe hit something
             ("Body Hit", np.float16), #index of whatever body it hit
-            ("Final Polar",np.float32), #Final point of probe
-            ("Final Azimuth",np.float32),
-            ("Final Radius", np.float32)
+            ("Final Polar",np.float64), #Final point of probe
+            ("Final Azimuth",np.float64),
+            ("Final Radius", np.float64)
         ]
     )
     return resultsTemplate
@@ -438,7 +452,7 @@ if Mass_Simulation_Mode:
         else:
             print("Using In-Game gravity")
 
-        outputdir = "OutputsWithDistance"
+        
         Path(outputdir).mkdir(parents=True, exist_ok=True)
 
         print(f"Starting {total_n_pikmin_to_make} pikmin with {n_sim_per_pikmin} runs each...")
@@ -487,7 +501,7 @@ else:
     else:
         print("Using In-Game gravity")
     ## Probe settings
-    unitvec = [0.995459,-0.071367,0.064554]#random_3d_unit_vector()
+    unitvec =  random_3d_unit_vector()#[0.8881108,-0.4542776,0.06993582]#
     print(unitvec)
     mag = 500
     print(mag)

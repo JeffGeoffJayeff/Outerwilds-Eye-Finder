@@ -15,6 +15,8 @@ import pandas as pd
 import datashader as ds
 import datashader.transfer_functions as tf
 
+cube_map_plot = True #If true makes cube map images
+
 def load_npy_files(folder_path):
     """Load all npy files from a folder and return combined data."""
     npy_files = list(Path(folder_path).glob("*.npy"))
@@ -113,8 +115,9 @@ def analyze_probe_visits(data):
     
     print(f"\nFound {len(multi_visit_probes)} probes that visited multiple bodies\n")
     
-    # Print launch conditions for multi-visit probes
-    if multi_visit_probes:
+    # Print launch conditions for multi-visit probe
+    multi_visit_probe = False
+    if False:  # Change to True if you want to print details for each multi-visit probe
         print("Launch conditions for probes visiting multiple bodies:")
         print("-" * 70)
         
@@ -412,11 +415,15 @@ def plot_spherical_points(data, polar_field='Eye Shell Polar', azimuth_field='Ey
     #arr[:limit] = True
     np.random.shuffle(arr)
     arr[:] = True
+    x = x[arr]
+    y = y[arr]
+    z = z[arr]
+    t = t[arr]
     df = pd.DataFrame({ #Take random samples 
-        'x': x[arr],
-        'y': y[arr],
-        'z': z[arr],
-        't': t[arr]
+        'x': x,
+        'y': y,
+        'z': z,
+        't': t
     })
     print(np.sum(np.isnan(df['x'])))
     print(np.sum(np.isnan(df['y'])))
@@ -428,7 +435,7 @@ def plot_spherical_points(data, polar_field='Eye Shell Polar', azimuth_field='Ey
     fig.add_surface(x=spherex, y=spherey, z=spherez, opacity=1.0,showscale=False)
     fig.show()
 
-def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth', radius='Final Sun Distance', range=100000):
+def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth', radius='Final Sun Distance', eyeshell='Eye Shell Time', body_hit='Body Hit', range=100000,body_hit_colors=None):
     # Get Cartesian mesh grid for Giant's Deep
     GD_radius = 1000
     sun_radius = 2000
@@ -457,8 +464,9 @@ def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell 
     polar = np.array(data[polar_field], dtype=float)
     azimuth = np.array(data[azimuth_field], dtype=float)
     radius = np.array(data[radius], dtype=float)
-    t = np.array(data['Eye Shell Time'], dtype=float)  # Assuming there's a time field for color mapping
-    
+    t = np.array(data[eyeshell], dtype=float)  # Assuming there's a time field for color mapping
+    body = np.array(data[body_hit], dtype=float)
+
     # Convert spherical to Cartesian coordinates
     x, y, z = spherical_to_cartesian(polar, azimuth, radius=radius)
     limit = range
@@ -466,75 +474,30 @@ def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell 
     arr[:limit] = True
     np.random.shuffle(arr)
     #arr[:] = True
+    # limit to so many points
+    x = x[arr]
+    y = y[arr]
+    z = z[arr]
+    t = t[arr]
+    body=body[arr]
     df = pd.DataFrame({ #Take random samples 
-        'x': x[arr],
-        'y': y[arr],
-        'z': z[arr],
-        't': t[arr]
+        'x': x,
+        'y': y,
+        'z': z,
+        't': t
     })
     print(np.sum(np.isnan(df['x'])))
     print(np.sum(np.isnan(df['y'])))
     print(np.sum(np.isnan(df['z'])))
     print(np.sum(np.isnan(df['t'])))
-    fig = px.scatter_3d(df, x='x', y='y', z='z', color='t')
-    fig.update_scenes(aspectmode='cube')  # Making the axes be a cube
-    fig.update_traces(marker_size=2)
-    fig.add_surface(x=GDx, y=GDy, z=GDz, opacity=1.0,showscale=False)
-    fig.add_surface(x=sunx, y=suny, z=sunz, opacity=1.0,showscale=False)
-    fig.show()
 
-
-def plot_launch_directions(data, x_field='Launch x', y_field='Launch y', z_field='Launch z', 
-                           body_hit_colors=None,limit=100000):
-    """
-    Plot launch directions in 3D Cartesian coordinates.
-    NaN points are colored discretely by 'Body Hit' index, valid points by 'Eye Shell Time' (continuous).
-    
-    Args:
-        data: numpy structured array
-        x_field: Field name for x component
-        y_field: Field name for y component
-        z_field: Field name for z component
-        body_hit_colors: Dictionary mapping Body Hit index to color name. 
-                        Example: {0: 'red', 1: 'blue', 2: 'green', 3: 'yellow'}
-                        If None, uses default Plotly colors.
-    """
-    if data is None or len(data) == 0:
-        print("No data to plot")
-        return
-    range = [-1,1]
-    # Extract Cartesian components
-    x = np.array(data[x_field], dtype=float)
-    y = np.array(data[y_field], dtype=float)
-    z = np.array(data[z_field], dtype=float)
-    t = np.array(data['Eye Shell Time'], dtype=float)
-    body = np.array(data['Body Hit'], dtype=float)
-
-    arr = np.zeros(len(x), dtype=bool)
-    arr[:limit] = True
-    np.random.shuffle(arr)
-    #arr[:] = True
-    x = x[arr]
-    y = y[arr]
-    z = z[arr]
-    t = t[arr]
-    body = body[arr]
-
-    print(f"Total points: {len(x)} \n Hit Something {np.sum(np.isfinite(body))} \n Hit Nothing {np.sum(np.isnan(body) & np.isnan(t))} \n Hit Eye Shell {np.sum(np.isfinite(t))}")
-
-    # Create mask for valid points
-    valid_mask = np.isfinite(x) & np.isfinite(y) & np.isfinite(z)
-    
     num_nan = np.sum(np.isnan(t))
     num_valid = np.sum(np.isfinite(t))
-    if num_nan > 0:
-        print(f"Found {num_nan} points with NaN values (will color by Body Hit)")
-    print(f"Using {num_valid} valid points (colored by Eye Shell Time)")
-    
+
     # Create figure
     fig = go.Figure()
 
-    # Add valid points (colored by Eye Shell Time - continuous)
+    # Points that reached the eye shell
     if num_valid > 0:
         x_valid = x[np.isfinite(t)]
         y_valid = y[np.isfinite(t)]
@@ -554,7 +517,7 @@ def plot_launch_directions(data, x_field='Launch x', y_field='Launch y', z_field
             name='Valid Points',
             opacity=1
         ))
-    # Endless Orbit:
+    # Endless Orbit: Probes that just orbit the system and never hit anything
     mask = np.isnan(t) & np.isnan(body)
     x_orbit = x[mask]
     y_orbit = y[mask]
@@ -569,8 +532,8 @@ def plot_launch_directions(data, x_field='Launch x', y_field='Launch y', z_field
         legendgroup='orbit',
         showlegend=True,
     ))
-    
-    # Hit Bodies
+
+    # Probes that hit something 
     if num_nan > 0:
         x_nan = x[np.isfinite(body)]
         y_nan = y[np.isfinite(body)]
@@ -600,13 +563,156 @@ def plot_launch_directions(data, x_field='Launch x', y_field='Launch y', z_field
                 z=group['z'],
                 mode='markers',
                 name=f"hit {body}",
-                marker=dict(size=2, color=body_hit_colors[body],opacity=0.5),
+                marker=dict(size=2, color=body_hit_colors[body],opacity=1),
                 legendgroup=body,   # ties it to the same legend entry
                 showlegend=True,
             ))
-    # TODO: Add plotting for when something neither hits a body nor reaches the eye shell, which is common due to the probe getting stuck in an orbit
-    fig.update_layout(scene=dict(aspectmode='cube',xaxis=dict(range=range),yaxis=dict(range=range),zaxis=dict(range=range)))
+
+    #fig = px.scatter_3d(df, x='x', y='y', z='z', color='t')
+    fig.update_scenes(aspectmode='cube')  # Making the axes be a cube
+    fig.update_traces(marker_size=2)
+    fig.add_surface(x=GDx, y=GDy, z=GDz, opacity=1.0,showscale=False)
+    fig.add_surface(x=sunx, y=suny, z=sunz, opacity=1.0,showscale=False)
     fig.show()
+
+
+def plot_launch_directions(data, relative_x_field='Relative Launch x', relative_y_field='Relative Launch y', relative_z_field='Relative Launch z', global_x_field='Global Launch x', global_y_field='Global Launch y', global_z_field='Global Launch z', body_hit_colors=None,limit=100000):
+    """
+    Plot launch directions in 3D Cartesian coordinates.
+    NaN points are colored discretely by 'Body Hit' index, valid points by 'Eye Shell Time' (continuous).
+    
+    Args:
+        data: numpy structured array
+        x_field: Field name for x component
+        y_field: Field name for y component
+        z_field: Field name for z component
+        body_hit_colors: Dictionary mapping Body Hit index to color name. 
+                        Example: {0: 'red', 1: 'blue', 2: 'green', 3: 'yellow'}
+                        If None, uses default Plotly colors.
+    """
+    if data is None or len(data) == 0:
+        print("No data to plot")
+        return
+    axis_range = [-1,1]
+    # Extract Cartesian components
+    arr = np.zeros(len(data[relative_x_field]), dtype=bool) #Doing this so both plots have the same points
+    arr[:limit] = True
+    np.random.shuffle(arr)
+
+    for i in range(2):
+        if i == 0:
+            x = np.array(data[relative_x_field], dtype=float)
+            y = np.array(data[relative_y_field], dtype=float)
+            z = np.array(data[relative_z_field], dtype=float)
+            t = np.array(data['Eye Shell Time'], dtype=float)
+            body = np.array(data['Body Hit'], dtype=float)
+        else:
+            x = np.array(data[global_x_field], dtype=float)
+            y = np.array(data[global_y_field], dtype=float)
+            z = np.array(data[global_z_field], dtype=float)
+            t = np.array(data['Eye Shell Time'], dtype=float)
+            body = np.array(data['Body Hit'], dtype=float)
+    
+        #arr[:] = True
+        x = x[arr]
+        y = y[arr]
+        z = z[arr]
+        t = t[arr]
+        body = body[arr]
+
+        print(f"Total points: {len(x)} \n Hit Something {np.sum(np.isfinite(body))} \n Hit Nothing {np.sum(np.isnan(body) & np.isnan(t))} \n Hit Eye Shell {np.sum(np.isfinite(t))}")
+        
+        num_nan = np.sum(np.isnan(t))
+        num_valid = np.sum(np.isfinite(t))
+        if num_nan > 0:
+            print(f"Found {num_nan} points with NaN values (will color by Body Hit)")
+        print(f"Using {num_valid} valid points (colored by Eye Shell Time)")
+        
+        # Create figure
+        fig = go.Figure()
+
+        # Add valid points (colored by Eye Shell Time - continuous)
+        if num_valid > 0:
+            x_valid = x[np.isfinite(t)]
+            y_valid = y[np.isfinite(t)]
+            z_valid = z[np.isfinite(t)]
+            t_valid = t[np.isfinite(t)]
+            
+            fig.add_trace(go.Scatter3d(
+                x=x_valid, y=y_valid, z=z_valid,
+                mode='markers',
+                marker=dict(
+                    size=2,
+                    color=t_valid,
+                    colorscale='Viridis',
+                    showscale=True,
+                    colorbar=dict(title="Eye Shell Time", x=1.1),
+                ),
+                name='Valid Points',
+                opacity=1
+            ))
+        # Endless Orbit:
+        mask = np.isnan(t) & np.isnan(body)
+        x_orbit = x[mask]
+        y_orbit = y[mask]
+        z_orbit = z[mask]
+        fig.add_trace(go.Scatter3d(
+            x=x_orbit,
+            y=y_orbit,
+            z=z_orbit,
+            mode='markers',
+            name="Orbiter",
+            marker=dict(size=2, color='black'),
+            legendgroup='orbit',
+            showlegend=True,
+        ))
+        
+        # Hit Bodies
+        if num_nan > 0:
+            x_nan = x[np.isfinite(body)]
+            y_nan = y[np.isfinite(body)]
+            z_nan = z[np.isfinite(body)]
+            body_hit = body[np.isfinite(body)]
+            
+            # Map Body Hit indices to color names
+            if body_hit_colors is None:
+                # Default color sequence
+                color_palette = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+                # Get unique non-NaN values
+                unique_body_hits = np.unique(body_hit[~np.isnan(body_hit)])
+                body_hit_colors = {int(i): color_palette[idx % len(color_palette)] 
+                                for idx, i in enumerate(unique_body_hits)}
+            
+            # Group NaN points by Body Hit index for better legend
+            df = pd.DataFrame({
+                'x': x_nan, 
+                'y': y_nan,
+                'z': z_nan,
+                'body': body_hit
+            })
+            for body, group in df.groupby('body'):
+                fig.add_trace(go.Scatter3d(
+                    x=group['x'],
+                    y=group['y'],
+                    z=group['z'],
+                    mode='markers',
+                    name=f"hit {body}",
+                    marker=dict(size=2, color=body_hit_colors[body],opacity=0.5),
+                    legendgroup=body,   # ties it to the same legend entry
+                    showlegend=True,
+                ))
+        fig.update_layout(scene=dict(aspectmode='cube',xaxis=dict(range=axis_range),yaxis=dict(range=axis_range),zaxis=dict(range=axis_range)))
+        fig.show()
+
+def convert_spherical_array_to_cartesian_for_cube_map(df, polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth'): #This is meant to work with the "Eye Shell" so no input for radius as the radius is uniform for all, r = 1
+    # x = r cos(theta)sin(phpi)
+    # y = r sin(theta)sin(phi)
+    # z = r cos(phi)
+    # Using the convention from https://mathworld.wolfram.com/SphericalCoordinates.html, theta is azimuthal and phi is polar so I assume I followed that convention when naming things
+    x = np.cos(df[polar_field]) * np.sin(df[azimuth_field])
+    y = np.sin(df[polar_field]) * np.sin(df[azimuth_field])
+    z = np.cos(df[azimuth_field])
+    return np.column_stack((x, y, z, np.abs(x),np.abs(y),np.abs(z))) #Return the absolute values as well for the cube map
 
 def plot_2D_crash(data,polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth'):
     canvas = ds.Canvas(plot_width=800*2, plot_height=400*2,x_range=(-np.pi,np.pi),y_range=(0,np.pi),x_axis_type='linear',y_axis_type='linear')
@@ -640,12 +746,40 @@ def plot_2D_crash(data,polar_field='Eye Shell Polar', azimuth_field='Eye Shell A
     agg = canvas.points(df, 'polar', 'azi', agg=ds.count())
     ds.tf.set_background(ds.tf.shade(agg, cmap=plt.cm.viridis), "white").to_pil().save("2D_crash.png")
 
-
+def plot_cube_map_face(data,width:float,case:str): # This function is meant to work with the output from convert_spherical_array_to_cartesian_for_cube_map, so the input data is expected to be a numpy array with columns [x, y, z, abs(x), abs(y), abs(z)]
+    canvas = ds.Canvas(plot_width=width,plot_height=width,x_axis_type='linear',y_axis_type='linear')
+    match case:
+        case 'pos_x':
+            u = -data[:,2] / data[:,3] # -z/abs(x)
+            v = data[:,1]/data[:,3] # y/abs(x)
+        case 'neg_x':
+            u = data[:,2] / data[:,3] # z/abs(x)
+            v = data[:,1]/data[:,3] # y/abs(x)
+        case 'pos_y':
+            u = data[:,0] / data[:,4] # x/abs(y)
+            v = -data[:,2]/data[:,4] # -z/abs(y)    
+        case 'neg_y':
+            u = data[:,0] / data[:,4] # x/abs(y)
+            v = data[:,2]/data[:,4] # z/abs(y)
+        case 'pos_z':
+            u = data[:,0] / data[:,5] # x/abs(z)
+            v = data[:,1]/data[:,5] # y/abs(z)
+        case 'neg_z':
+            u = data[:,0] / data[:,5] # x/abs(z)
+            v = data[:,1]/data[:,5] # y/abs(z)
+        case _:
+            print(f"ERROR: Invalid case: {case}")
+            return
+    df =  pd.DataFrame({
+        'u': u,
+        'v': v })
+    agg = canvas.points(df, 'u', 'v', agg=ds.count())
+    ds.tf.set_background(ds.tf.shade(agg, cmap=plt.cm.viridis), "white").to_pil().save(f"cube_map_{case}.png")
 def main():
 
     """Main execution function."""
-    outputs_folder = Path("OutputsWithDistance")
-    
+    outputs_folder = Path("UniformDistEyeHasMass")
+    print(f"Analyzing {outputs_folder}")
     if not outputs_folder.exists():
         print(f"Outputs folder not found at {outputs_folder.absolute()}")
         print("Creating a demo using existing npy files instead...")
@@ -660,6 +794,9 @@ def main():
         # Analyze visits
         analyze_probe_visits(data)
         
+        
+
+
         # Auto-select bin resolution based on dataset size
         num_points = len(data)
         bins = min(100, max(30, int(np.sqrt(num_points / 100))))
@@ -698,7 +835,7 @@ def main():
             
             plt.show()
 
-        plot_spherical_points(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth', radius=286500,range=400000)
+        #plot_spherical_points(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth', radius=286500,range=400000)
         
         # Define custom colors for Body Hit indices (NaN points only)
         colormap = {
@@ -719,9 +856,33 @@ def main():
             14: "#8673A1",
             15: "#00FF6A"
         }
-        plot_launch_directions(data, x_field='Launch x', y_field='Launch y', z_field='Launch z',body_hit_colors=colormap,limit=400000)
-        plot_distance(data, polar_field='Final Polar', azimuth_field='Final Azimuth', radius='Final Radius', range=400000)
+        plot_launch_directions(data, relative_x_field='Relative Launch x', relative_y_field='Relative Launch y', relative_z_field='Relative Launch z', global_x_field='Global Launch x', global_y_field='Global Launch y', global_z_field='Global Launch z', body_hit_colors=colormap,limit=300000)
+        plot_distance(data, polar_field='Final Polar', azimuth_field='Final Azimuth', radius='Final Radius', range=300000,body_hit_colors=colormap)
         plot_2D_crash(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth')
+
+        # Cube Map Sorting
+        # There's probably a more efficient way to do this but it is readable
+        if cube_map_plot:
+            data_in_cart = convert_spherical_array_to_cartesian_for_cube_map(data[np.isfinite(data['Eye Shell Time'])], polar_field='Eye Shell Polar', azimuth_field='Eye Shell Azimuth')        
+        
+            x_faces = data_in_cart[(data_in_cart[:,3] >= data_in_cart[:,4]) & (data_in_cart[:,3] >= data_in_cart[:,5])] #abs x is the largest component
+            pos_x_face = x_faces[x_faces[:,0] >= 0]
+            neg_x_face = x_faces[x_faces[:,0] < 0]
+
+            y_faces = data_in_cart[(data_in_cart[:,4] >= data_in_cart[:,3]) & (data_in_cart[:,4] >= data_in_cart[:,5])] #abs y is the largest component
+            pos_y_face = y_faces[y_faces[:,1] >= 0]
+            neg_y_face = y_faces[y_faces[:,1] < 0]
+
+            z_faces = data_in_cart[(data_in_cart[:,5] >= data_in_cart[:,3]) & (data_in_cart[:,5] >= data_in_cart[:,4])] #abs z is the largest component
+            pos_z_face = z_faces[z_faces[:,2] >= 0]
+            neg_z_face = z_faces[z_faces[:,2] < 0]
+
+            cases = ['pos_x','neg_x','pos_y','neg_y','pos_z','neg_z']
+            datas = [pos_x_face,neg_x_face,pos_y_face,neg_y_face,pos_z_face,neg_z_face]
+            for i in range(len(cases)):
+                plot_cube_map_face(datas[i], width=2048, case=cases[i])
+            
+
     else:
         print("No data was loaded.")
 
