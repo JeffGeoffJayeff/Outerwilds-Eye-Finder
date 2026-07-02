@@ -1,14 +1,17 @@
 # Program that lets the user type in commands to analyze data
 # V 0.1
 
+import re
 import numpy as np
 from pathlib import Path
+from tabulate import tabulate #For making tables 
 
 class terminal:
 
     def __init__(self):
         self.dataset = [] #
         self.running = True
+        self.simulations = 0
         self.commands = {
             "quit": self.quit,
             "FileLoad": self.loadFile,
@@ -43,8 +46,10 @@ class terminal:
         if command in self.commands:
             if len(parameters) == 0:
                 self.commands[command]()
-            else:
+            elif len(parameters) > 0:
                 self.commands[command](*parameters)
+            else:
+                print("ERROR: Invalid number of parameters")
         else:
             print("ERROR: Unknown command")
 
@@ -59,15 +64,57 @@ class terminal:
         for filename in npy_files:
             seperateData.append(np.load(filename))
         combinedData = np.concatenate(seperateData)
-        self.dataset = combinedData
-        print(f"Folder {foldername} loaded with {len(seperateData):,d} files and {np.size(self.dataset,0):,d} simulations")
+        if len(self.dataset) > 0:
+            self.dataset = np.concatenate([self.dataset, combinedData]) 
+        else:
+            self.dataset = combinedData
+        self.simulations += np.size(combinedData,0)
+        print(f"Folder {foldername} loaded with {len(seperateData):,d} files and {np.size(combinedData,0):,d} simulations\nTotal number of simulations: {self.simulations:,d}")
 
     def visitStats(self):
-        vistnums = []
-        for body in self.visit_fields:
-            vistnums.append(np.sum(self.dataset[body]))
-        print(vistnums)
+        visitnums = []
+        totalVisits = 0
 
+        # Calculating hit values
+        unique, counts = np.unique(self.dataset['Body Hit'], return_counts=True)
+        totalHits = np.sum(self.dataset['Hit Something'])
+
+        countDict = dict(zip(unique, counts))
+        for body in self.visit_fields:
+            totalVisits += np.sum(self.dataset[body]) #Bit wasteful to sum twice but it is clearer
+        for index, body in enumerate(self.visit_fields):
+            
+            visitSum = np.sum(self.dataset[body])
+            visitPercent = visitSum / totalVisits * 100 #Percentage of visits to this body out of all visits to all bodies
+            visitofAllSims = visitSum / self.simulations * 100 #Percentage of visits to this body out of all simulations
+
+            if index in countDict:
+                hitSum = countDict[index] #Doing this because np.unique doesn't return the index of bodies that were never hit
+            else:
+                hitSum = 0
+            hitPercent = hitSum / totalHits * 100 #Percentage of hits to this body out of all hits to all bodies
+            hitofAllSims = hitSum / self.simulations * 100 #Hits to this body of all simulations
+
+            tableEntry = [re.sub(" Visits","",body)] #Remove visits from the names of the bodies for the table
+            tableEntry.append(f"{visitSum:,}")
+            if visitSum != 0:
+                tableEntry.append(f"{visitPercent:.3f}")
+                tableEntry.append(f"{visitofAllSims:.3f}")
+            else:
+                tableEntry.append("0")
+                tableEntry.append("0")
+
+            tableEntry.append(f"{hitSum:,}") #Add the number of hits to the table
+            if hitSum != 0:
+                tableEntry.append(f"{hitPercent:.3f}")
+                tableEntry.append(f"{hitofAllSims:.3f}")
+            else:
+                tableEntry.append("0")
+                tableEntry.append("0")
+
+            visitnums.append(tableEntry)
+        outputTable = tabulate(visitnums,showindex=True,headers=["Body","Visits","Visit/Visits %","Visit/Sim %","Hits","Hits/Hits %","Hit/Sim %"],tablefmt="pretty")
+        print(outputTable)
     def helpCommand(self):
         print("Current Commands:")
         for cmd in self.commands:
