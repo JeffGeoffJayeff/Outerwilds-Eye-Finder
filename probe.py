@@ -12,20 +12,20 @@ from scipy.optimize import minimize
 import plotly.express as px
 import plotly.graph_objects as go
 from multiprocessing import Pool
-import multiprocessing as mp
+import multiprocessing as mp 
 
 #np.seterr(all='raise')
 Properties = pd.read_pickle("Properties.pkl")
 bodiesfolder = Path("Bodies")
 files = list(bodiesfolder.glob("*.npy"))
-outputdir = "UniformDistEyeHasMass"
+outputdir = "UniformDistDifferentSpeed"
 G = 10**-3
 eye_distance = 286500 #Distance of the eye from the sun in meters https://www.reddit.com/r/outerwilds/comments/t7mxcy/how_far_away_is_the_eye_base_game_spoilers/
 sunBodyIndex = 0 #Index that is the Sun in the Bodies list
 NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
 n_sim_per_pikmin = 1000 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
-total_n_pikmin_to_make = 500 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin  will run n_sim_per_pikmin simulations
-pikmin_on_field = 14 #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
+total_n_pikmin_to_make = 3000 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin  will run n_sim_per_pikmin simulations
+pikmin_on_field = 13 #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
 Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
 plotPath = True #Whether to plot or not
@@ -393,11 +393,13 @@ def makeResultsTemplate(length:int):
         ]
     )
     return resultsTemplate
-def simulationPikmin(cannonIndex:int,launchMag:float,bodiesList:list[Body],launchUnitVector:np.ndarray,launchTime:float,timestep:float,endtime:float,n_sims:int,outputdir:str,printoutput:bool=False):
+def simulationPikmin(cannonIndex:int,launchMag:float,bodiesList:list[Body],launchUnitVector:np.ndarray,launchTime:float,timestep:float,endtime:float,n_sims:int,outputdir:str,printoutput:bool=False,minLaunchMag:float=250,maxLaunchMag:float=1000):
     starttime = time.time()
     if printoutput: 
         print(f"[{mp.current_process().name}] Starting simulation with {n_sims} runs...")
     results = makeResultsTemplate(n_sims) 
+    if launchMag is None:
+        launchMag = np.random.uniform(minLaunchMag, maxLaunchMag)
     pikmin = probe(launchbodyindex=cannonIndex,launchvel=launchMag,Bodies=bodiesList,launchunitvector=launchUnitVector,launchtime=launchTime,endtime=endtime,timestep=timestep)
     for i in range(n_sims):
         #How to change the simulation each run
@@ -461,8 +463,8 @@ if Mass_Simulation_Mode:
         unitvec = random_3d_unit_vector()
         
         with mp.Pool(processes=pikmin_on_field) as pool:
-            for _ in range(total_n_pikmin_to_make):
-                pool.apply_async(simulationPikmin, args=(CannonIndex, 500, Bodies, unitvec, 0, 1/60, 22, n_sim_per_pikmin, outputdir, True))
+            for _  in range(total_n_pikmin_to_make):
+                pool.apply_async(simulationPikmin, args=(CannonIndex, None, Bodies, unitvec, 0, 1/60, 22, n_sim_per_pikmin, outputdir, True))
             pool.close()
             pool.join()
         print("All pikmin have finished their simulations.")

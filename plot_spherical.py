@@ -15,6 +15,7 @@ import pandas as pd
 import datashader as ds
 import datashader.transfer_functions as tf
 
+outputfolder = "ImageOutputs/"
 cube_map_plot = True #If true makes cube map images
 
 def load_npy_files(folder_path):
@@ -744,7 +745,7 @@ def plot_2D_crash(data,polar_field='Eye Shell Polar', azimuth_field='Eye Shell A
     })
 
     agg = canvas.points(df, 'polar', 'azi', agg=ds.count())
-    ds.tf.set_background(ds.tf.shade(agg, cmap=plt.cm.viridis), "white").to_pil().save("2D_crash.png")
+    ds.tf.set_background(ds.tf.shade(agg, cmap=plt.cm.viridis), "white").to_pil().save(f"{outputfolder}2D_crash.png")
 
 def plot_cube_map_face(data,width:float,case:str): # This function is meant to work with the output from convert_spherical_array_to_cartesian_for_cube_map, so the input data is expected to be a numpy array with columns [x, y, z, abs(x), abs(y), abs(z)]
     canvas = ds.Canvas(plot_width=width,plot_height=width,x_axis_type='linear',y_axis_type='linear')
@@ -774,11 +775,11 @@ def plot_cube_map_face(data,width:float,case:str): # This function is meant to w
         'u': u,
         'v': v })
     agg = canvas.points(df, 'u', 'v', agg=ds.count())
-    ds.tf.set_background(ds.tf.shade(agg, cmap=plt.cm.viridis), "white").to_pil().save(f"cube_map_{case}.png")
+    ds.tf.set_background(ds.tf.shade(agg, cmap=plt.cm.viridis), "white").to_pil().save(f"{outputfolder}cube_map_{case}.png")
 def main():
 
     """Main execution function."""
-    outputs_folder = Path("UniformDistEyeHasMass")
+    outputs_folder = Path("UniformDistDifferentSpeed")
     print(f"Analyzing {outputs_folder}")
     if not outputs_folder.exists():
         print(f"Outputs folder not found at {outputs_folder.absolute()}")
