@@ -5,6 +5,8 @@ import re
 import numpy as np
 from pathlib import Path
 from tabulate import tabulate #For making tables 
+from plot_spherical import spherical_to_cartesian, cartesian_to_spherical
+
 
 class terminal:
 
@@ -17,8 +19,9 @@ class terminal:
             "FileLoad": self.loadFile,
             "FolderLoad": self.loadFolder,
             "VisitStats": self.visitStats,
-            "help": self.helpCommand,
-            "print": self.printData
+            "Help": self.helpCommand,
+            "Print": self.printData,
+            "Save": self.saveData
         }
         self.visit_fields = [
         'Sun Visits',
@@ -71,6 +74,9 @@ class terminal:
         self.simulations += np.size(combinedData,0)
         print(f"Folder {foldername} loaded with {len(seperateData):,d} files and {np.size(combinedData,0):,d} simulations\nTotal number of simulations: {self.simulations:,d}")
 
+    def lookupLaunchConditions(self, x,y,z): #Look up the launch conditions of the simulation that results in the closest x y z coordinates on the eye shell
+        desiredCoords = cartesian_to_spherical(x,y,z)
+        
     def visitStats(self):
         visitnums = []
         totalVisits = 0
@@ -126,11 +132,22 @@ class terminal:
     def quit(self):
         self.running = False
         print("Bye bye!")
+    
+    def saveData(self, fileName:str, folderName:str=None):
+        if len(self.dataset) > 0:
+            if folderName is None:
+                savePath = f"{fileName}.npy"
+            else:
+                savePath = f"{folderName}/{fileName}.npy"
+            np.save(savePath, self.dataset)
+            print(f"Data saved to {savePath}")
+        else:
+            print("No data to save")
 def main():
     print("Start of session")
     termGuy = terminal()
     while termGuy.running:
-        termGuy.commandRunner("help")
+        termGuy.commandRunner("Help")
         command = input("Enter a command (or 'quit' to exit): ")
         termGuy.commandRunner(command)
 
