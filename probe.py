@@ -2,7 +2,7 @@
 
 import numpy as np
 import math
-import pandas as pd
+import pandas as pd 
 from pathlib import Path
 from datetime import datetime
 import time
@@ -30,6 +30,41 @@ Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple l
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
 plotPath = True #Whether to plot or not
 
+resultsDType = [ #Used in results template
+            ("Relative Launch x",np.float64), #This is the launch unit vector relative to the cannon
+            ("Relative Launch y",np.float64),
+            ("Relative Launch z",np.float64),
+            ("Global Launch x",np.float64), #This is launch direction unit vector relative to the Sun/Global coordinates
+            ("Global Launch y",np.float64),
+            ("Global Launch z",np.float64),
+            ("Relative Launch Velocity",np.float32),
+            ("Global Launch Velocity",np.float32),
+            ("Reached Eye",np.bool_),
+            ("Eye Shell Time",np.float32), #The time the probe reaches 286 km or whatever it is
+            ("Eye Shell Polar",np.float64), #The polar of the above point
+            ("Eye Shell Azimuth",np.float64), #Azimuth of the above point
+            ("Sun Visits",np.int16),
+            ("Sun Station Visits",np.int16),
+            ("Ember Twin Visits",np.int16),
+            ("Ash Twin Visits", np.int16),
+            ("Timber Hearth Visits",np.int16),
+            ("Attlerock Visits", np.int16),
+            ("Brittle Hollow Visits", np.int16),
+            ("Hollow's Lantern Visits", np.int16),
+            ("Giant's Deep Visits",np.int16),
+            ("Cannon Visits",np.int16),
+            ("Dark Bramble Visits",np.int16),
+            ("Interloper Visits", np.int16),
+            ("White Hole Visits", np.int16),
+            ("Stranger Visits", np.int16),
+            ("Random Eye Visits", np.int16),
+            ("Spacey Visits", np.int16),
+            ("Hit Something", np.bool_), #Whether or not the probe hit something
+            ("Body Hit", np.float16), #index of whatever body it hit
+            ("Final Polar",np.float64), #Final point of probe
+            ("Final Azimuth",np.float64),
+            ("Final Radius", np.float64)
+        ]
 class Body:
     def __init__(self,timeandpos,propertiesDataframe = None):
         self.array = timeandpos
@@ -356,41 +391,7 @@ def makeResultsTemplate(length:int):
     # Create results template for storing simulation results
     resultsTemplate = np.empty(
         length,
-        dtype = [
-            ("Relative Launch x",np.float64),
-            ("Relative Launch y",np.float64),
-            ("Relative Launch z",np.float64),
-            ("Global Launch x",np.float64),
-            ("Global Launch y",np.float64),
-            ("Global Launch z",np.float64),
-            ("Relative Launch Velocity",np.float32),
-            ("Global Launch Velocity",np.float32),
-            ("Reached Eye",np.bool_),
-            ("Eye Shell Time",np.float32), #The time the probe reaches 286 km or whatever it is
-            ("Eye Shell Polar",np.float64), #The polar of the above point
-            ("Eye Shell Azimuth",np.float64), #Azimuth of the above point
-            ("Sun Visits",np.int16),
-            ("Sun Station Visits",np.int16),
-            ("Ember Twin Visits",np.int16),
-            ("Ash Twin Visits", np.int16),
-            ("Timber Hearth Visits",np.int16),
-            ("Attlerock Visits", np.int16),
-            ("Brittle Hollow Visits", np.int16),
-            ("Hollow's Lantern Visits", np.int16),
-            ("Giant's Deep Visits",np.int16),
-            ("Cannon Visits",np.int16),
-            ("Dark Bramble Visits",np.int16),
-            ("Interloper Visits", np.int16),
-            ("White Hole Visits", np.int16),
-            ("Stranger Visits", np.int16),
-            ("Random Eye Visits", np.int16),
-            ("Spacey Visits", np.int16),
-            ("Hit Something", np.bool_), #Whether or not the probe hit something
-            ("Body Hit", np.float16), #index of whatever body it hit
-            ("Final Polar",np.float64), #Final point of probe
-            ("Final Azimuth",np.float64),
-            ("Final Radius", np.float64)
-        ]
+        dtype = resultsDType
     )
     return resultsTemplate
 def simulationPikmin(cannonIndex:int,launchMag:float,bodiesList:list[Body],launchUnitVector:np.ndarray,launchTime:float,timestep:float,endtime:float,n_sims:int,outputdir:str,printoutput:bool=False,minLaunchMag:float=250,maxLaunchMag:float=1000):
