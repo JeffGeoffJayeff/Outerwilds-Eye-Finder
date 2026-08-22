@@ -53,7 +53,25 @@ class terminal:
         'Stranger Visits',
         'Random Eye Visits',
         'Spacey Visits'
-        ] #Names of visit fields in teh dataset, I don't know if this changed in the various folders but they are correct for the latest two, UniformDistDifferentSpeed and UniformDistEyeHasMass
+        ] #Names of visit fields in the dataset, I don't know if this changed in the various folders but they are correct for the latest two, UniformDistDifferentSpeed and UniformDistEyeHasMass
+        self.visitFieldsandBody = {
+            "sun" : self.visitFields[0],
+            "sunstation" : self.visitFields[1],
+            "embertwin" : self.visitFields[2],
+            "ashtwin" : self.visitFields[3],
+            "timberhearth" : self.visitFields[4],
+            "attlerock" : self.visitFields[5],
+            "brittlehollow" : self.visitFields[6],
+            "hollowslantern" : self.visitFields[7],
+            "giantsdeep" : self.visitFields[8],
+            "cannon" : self.visitFields[9],
+            "darkbramble" : self.visitFields[10],
+            "interloper" : self.visitFields[11],
+            "whitehole" : self.visitFields[12],
+            "stranger" : self.visitFields[13],
+            "randomeye" : self.visitFields[14],
+            "spacey" : self.visitFields[15]
+        }
         self.totalVisitsName = "Total Visits" #name of the column that holds the sum of visits
     def commandRunner(self, input:str):
         splitInput = input.split(" ")
@@ -183,13 +201,27 @@ class terminal:
             print(f"Data saved to {savePath}")
         else:
             print("No data to save")
-    def sortbyVisits(self):
-        if any(self.totalVisitsName != name for name in self.dataset.dtype.names):
-            print(f"{self.totalVisitsName} not found, calculating sum of visits...")
-            self.sumVisits()
-        print("Sorting dataset by total visits in descending order...")
-        self.dataset = self.dataset[np.argsort(self.dataset[self.totalVisitsName])[::-1]]
-        print("Dataset sorted by total visits in descending order")
+    def sortbyVisits(self, name:str="total"):
+        if name.casefold() == "total":
+            if any(self.totalVisitsName != name for name in self.dataset.dtype.names):
+                print(f"{self.totalVisitsName} not found, calculating sum of visits...")
+                self.sumVisits()
+            print("Sorting dataset by total visits in descending order...")
+            self.dataset = self.dataset[np.argsort(self.dataset[self.totalVisitsName])[::-1]]
+            print("Dataset sorted by total visits in descending order")
+        elif name.casefold() == "nosun":
+            if any(self.totalVisitsName != name for name in self.dataset.dtype.names):
+                print(f"{self.totalVisitsName} not found, calculating sum of visits...")
+                self.sumVisits()
+            print("Sorting dataset by total visits excluding sun in descending order...")
+            self.dataset = self.dataset[np.argsort(self.dataset[self.totalVisitsName] - self.dataset[self.visitFieldsandBody["sun"]])[::-1]]
+            print("Dataset sorted by total visits excluding sun in descending order")
+        elif name.casefold() in self.visitFieldsandBody:
+            field = self.visitFieldsandBody[name.casefold()]
+            self.dataset = self.dataset[np.argsort(self.dataset[field])[::-1]]
+            print(f"Dataset sorted by visits to {name} in descending order")
+        else:
+            print(f"ERROR: Invalid body name {name}, must be one of {list(self.visitFieldsandBody.keys())} or 'total'")
     def sumVisits(self):
         visit_fields = [name for name in self.dataset.dtype.names if 'Visits' in name]
         sumColumn = np.sum([self.dataset[field] for field in visit_fields], axis=0)

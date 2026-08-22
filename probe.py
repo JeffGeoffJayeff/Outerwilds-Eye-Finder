@@ -26,7 +26,7 @@ NormalGravityforAll = True #This controls whether gravity is calculated using Ne
 n_sim_per_pikmin = 1000 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
 total_n_pikmin_to_make = 3000 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin  will run n_sim_per_pikmin simulations
 pikmin_on_field = 13 #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
-Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
+Mass_Simulation_Mode = False #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
 plotPath = True #Whether to plot or not
 
@@ -504,9 +504,9 @@ else:
     else:
         print("Using In-Game gravity")
     ## Probe settings
-    unitvec =  random_3d_unit_vector()#[0.8881108,-0.4542776,0.06993582]#
+    unitvec =  [0.918943117466462,-0.28645035112454015,0.27108991718920117]#random_3d_unit_vector()#[0.8881108,-0.4542776,0.06993582]#
     print(unitvec)
-    mag = 500
+    mag = 453.0303039550781
     print(mag)
     #calculateDragTest()
     ## Probe Simulation
