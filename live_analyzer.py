@@ -7,6 +7,7 @@ from pathlib import Path
 from tabulate import tabulate #For making tables 
 from plot_spherical import spherical_to_cartesian, cartesian_to_spherical
 from probe import resultsDType
+from probe import singleSimulation
 
 eyeShellRadius = 286500 #The radius of the eye shell in meters https://www.reddit.com/r/outerwilds/comments/t7mxcy/how_far_away_is_the_eye_base_game_spoilers/
 
@@ -145,7 +146,7 @@ class terminal:
         outputTable = tabulate(table, tablefmt="pretty")
         print(outputTable)
         #print(table)
-    def lookupLaunchConditions(self,x,y,z,searchtype:str=None): #Look up the launch conditions of the simulation that results in the closest x y z coordinates on either the eye shell or the final probe position
+    def lookupLaunchConditions(self,x,y,z,searchtype:str="final"): #Look up the launch conditions of the simulation that results in the closest x y z coordinates on either the eye shell or the final probe position
         #Outputs as a numpy array of [unitx,unity,unitz,velocity,index]
         x = float(x)
         y = float(y)
@@ -190,7 +191,8 @@ class terminal:
     def quit(self):
         self.running = False
         print("Bye bye!")
-    
+    def runSimulation(self,launchMag:float,launchUnitVector:np.ndarray,launchTime:float=0,timestep:float=1/60,endtime:float=22,printoutput:bool=False,displayPath:bool=False):
+        singleSimulation(launchMag,launchUnitVector,launchTime,timestep,endtime,printoutput)
     def saveData(self, fileName:str, folderName:str=None):
         if len(self.dataset) > 0:
             if folderName is None:

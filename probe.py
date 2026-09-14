@@ -18,15 +18,15 @@ import multiprocessing as mp
 Properties = pd.read_pickle("Properties.pkl")
 bodiesfolder = Path("Bodies")
 files = list(bodiesfolder.glob("*.npy"))
-outputdir = "UniformDistDifferentSpeed"
+outputdir = "UniformDistDifferentLowerSpeed"
 G = 10**-3
 eye_distance = 286500 #Distance of the eye from the sun in meters https://www.reddit.com/r/outerwilds/comments/t7mxcy/how_far_away_is_the_eye_base_game_spoilers/
 sunBodyIndex = 0 #Index that is the Sun in the Bodies list
 NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
 n_sim_per_pikmin = 1000 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
-total_n_pikmin_to_make = 3000 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin  will run n_sim_per_pikmin simulations
+total_n_pikmin_to_make = 5000 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin  will run n_sim_per_pikmin simulations
 pikmin_on_field = 13 #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
-Mass_Simulation_Mode = False #Whether or not you are simulating one or multiple launches
+Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
 plotPath = True #Whether to plot or not
 
@@ -417,6 +417,71 @@ def simulationPikmin(cannonIndex:int,launchMag:float,bodiesList:list[Body],launc
     np.save(f"{filename}.npy",results)
     #np.savetxt(f"{filename}.csv",results,delimiter=",")
     return 
+def singleSimulation(files:list[str],launchMag:float,bodiesList:list[Body],launchUnitVector:np.ndarray,launchTime:float=0,timestep:float=1/60,endtime:float=22,printoutput:bool=False,displayPath:bool=False):
+    Bodies = [] #Create list to store bodies into 
+    Names = []
+    for i in range(0,len(files)): #Load in bodies
+        xyzarray = np.load(files[i])
+        xyzarray.flags.writeable = False #Make the array read-only to prevent accidental modification
+        Bodies.append(Body(xyzarray,Properties.iloc[i]))
+        Names.append(Bodies[i].name)
+        if Bodies[i].name == "Cannon":
+            CannonIndex = i
+    if NormalGravityforAll: #Change masses to have the same surface gravity as in the linear gravity system
+        print("Changing masses for Newtonian gravitation...")
+        for i in range(len(Bodies)):
+            CurrentBody = Bodies[i]
+            if CurrentBody.isGravityLinear == True: #Just making this explicit here
+                if np.isnan(CurrentBody.mass):
+                    print(f"{CurrentBody.name} has NAN mass, skipping")
+                    continue
+                if np.isnan(CurrentBody.surface_radius):
+                    print(f"{CurrentBody.name} has no surface, skipping")
+                    continue #Avoiding issues with NANs
+                elif CurrentBody.surface_radius == 0:
+                    print(f"{CurrentBody.name} has a surface radius of 0, skipping")
+                    continue
+                else:
+                    CurrentBody.converttoRealGravity()
+            else:
+                print(f"{CurrentBody.name} already has Newtonian gravity")
+                continue
+    else:
+        print("Using In-Game gravity")
+
+
+    singleProbe = probe(launchbodyindex=CannonIndex,launchvel=launchMag,Bodies=bodiesList,launchunitvector=launchUnitVector,launchtime=launchTime,endtime=endtime,timestep=timestep)
+    singleProbe.runSimulation()
+    singleProbe.printSimulationEvents()
+    print(singleProbe.Results())
+
+    if plotPath:
+        # Get Cartesian mesh grid
+            sun_radius = 2000
+            spherephi, spheretheta = np.mgrid[0.0:np.pi:20j, 0.0:2.0 * np.pi:20j] #Change the 20j to somethingelsej if you want different resolution on the sphere
+            spherex = sun_radius*np.sin(spherephi) * np.cos(spheretheta)
+            spherey = sun_radius*np.sin(spherephi) * np.sin(spheretheta)
+            spherez = sun_radius*np.cos(spherephi)
+            probepath = np.zeros((len(singleProbe.path.t),4))
+            probepath[:,0] = singleProbe.path.t
+            probepath[:,1:4] = singleProbe.path.y[[0,2,4],:].T
+            if not np.isnan(singleProbe.eyeArrivalTime):
+                print(f"Time: {singleProbe.path.t_events[15]}, Cartesian Coordinates: {singleProbe.getXYZ(singleProbe.eyeArrivalTime)}, Spherical {cartToSpherical(singleProbe.getXYZ(singleProbe.eyeArrivalTime))}")
+            range = [-800000,800000]
+            step = 60*1 #Step in stepsizes
+            fig = px.scatter_3d(x=probepath[:,1][::step],y=probepath[:,2][::step],z=probepath[:,3][::step],animation_frame=probepath[:,0][::step],range_x=range,range_y=range,range_z=range) #
+            fig.add_trace(go.Scatter3d(
+                        x=probepath[:,1][::step],
+                        y=probepath[:,2][::step],
+                        z=probepath[:,3][::step],
+                        mode='lines',
+                        name="probe trajectory",
+                    ))
+            fig.add_surface(x=spherex, y=spherey, z=spherez, opacity=1.0,showscale=False)
+            fig.update_scenes(aspectmode='cube') #Making the axes be a cube
+            fig.show()
+            np.save("probepath.npy",probepath)
+
 
 if Mass_Simulation_Mode:
     if __name__ == "__main__":
@@ -465,7 +530,7 @@ if Mass_Simulation_Mode:
         
         with mp.Pool(processes=pikmin_on_field) as pool:
             for _  in range(total_n_pikmin_to_make):
-                pool.apply_async(simulationPikmin, args=(CannonIndex, None, Bodies, unitvec, 0, 1/60, 22, n_sim_per_pikmin, outputdir, True))
+                pool.apply_async(simulationPikmin, args=(CannonIndex, None, Bodies, unitvec, 0, 1/60, 22, n_sim_per_pikmin, outputdir, True,250,500))
             pool.close()
             pool.join()
         print("All pikmin have finished their simulations.")
@@ -504,9 +569,9 @@ else:
     else:
         print("Using In-Game gravity")
     ## Probe settings
-    unitvec =  [0.918943117466462,-0.28645035112454015,0.27108991718920117]#random_3d_unit_vector()#[0.8881108,-0.4542776,0.06993582]#
+    unitvec =  [0.26765889871405635, -0.1353069576099318, 0.9539657966413275]#random_3d_unit_vector()#[0.8881108,-0.4542776,0.06993582]#
     print(unitvec)
-    mag = 453.0303039550781
+    mag = 305.8408508300781
     print(mag)
     #calculateDragTest()
     ## Probe Simulation

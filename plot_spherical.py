@@ -440,6 +440,7 @@ def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell 
     # Get Cartesian mesh grid for Giant's Deep
     GD_radius = 1000
     sun_radius = 2000
+    eye_radius = 286500
     spherephi, spheretheta = np.mgrid[0.0:np.pi:20j, 0.0:2.0 * np.pi:20j] #Change the 20j to somethingelsej if you want different resolution on the sphere
     GDx = GD_radius*np.sin(spherephi) * np.cos(spheretheta) + 3421.723
     GDy = GD_radius*np.sin(spherephi) * np.sin(spheretheta) - 16097.95
@@ -448,6 +449,10 @@ def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell 
     sunx = sun_radius*np.sin(spherephi) * np.cos(spheretheta)
     suny = sun_radius*np.sin(spherephi) * np.sin(spheretheta)
     sunz = sun_radius*np.cos(spherephi)
+
+    eyex = eye_radius*np.sin(spherephi) * np.cos(spheretheta)
+    eyey = eye_radius*np.sin(spherephi) * np.sin(spheretheta)
+    eyez = eye_radius*np.cos(spherephi)
     """
     Plot points in spherical coordinates on a 3D sphere.
     
@@ -574,6 +579,7 @@ def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell 
     fig.update_traces(marker_size=2)
     fig.add_surface(x=GDx, y=GDy, z=GDz, opacity=1.0,showscale=False)
     fig.add_surface(x=sunx, y=suny, z=sunz, opacity=1.0,showscale=False)
+    fig.add_surface(x=eyex, y=eyey, z=eyez, opacity=0.5,showscale=False)
     fig.show()
 
 
@@ -779,7 +785,7 @@ def plot_cube_map_face(data,width:float,case:str): # This function is meant to w
 def main():
 
     """Main execution function."""
-    outputs_folder = Path("UniformDistDifferentSpeed")
+    outputs_folder = Path("UniformDistEyeHasMass") #NOTE: Change this to the folder where your npy files are located
     print(f"Analyzing {outputs_folder}")
     if not outputs_folder.exists():
         print(f"Outputs folder not found at {outputs_folder.absolute()}")
