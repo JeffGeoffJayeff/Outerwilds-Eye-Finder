@@ -9,17 +9,17 @@ import pandas as pd
 # Purpose: The point of this file is to calculate the position of each body at a specific time, and output them to a file 
 # These files are the ones in "Bodies"
 # It also graphs their positions as refactoring it into a separate program is an entire thing
-def main():
+def main(sun_mass=4*10**11,sun_radius=2000,Stepsize=1/60,EndMinute=23,graphresults=False,Savemotion=False,Path=True,BodyPaths=True):
     G = 1*10**(-3) #Gravitational Constant
-    sun_mass = 4*10**11
-    sun_radius = 2000
-    ### Config Stuff
-    Stepsize = 1 #In seconds
-    EndMinute = 23 #Timeloop ends at 22:40 in the games, in minutes btw
-    graphresults = True #Make a graph of the planet positions? (Doesn't do well with lots of points)
-    Savemotion = False #Save the position of all bodies to file?
-    Path = True #Shows the trajectory of probe path
-    BodyPaths =  True #graphresults #Whether to show the path of the bodies in the system or not
+    # sun_mass = 4*10**11
+    # sun_radius = 2000
+    # ### Config Stuff
+    # Stepsize = 1/60 #In seconds
+    # EndMinute = 23 #Timeloop ends at 22:40 in the games, in minutes btw
+    # graphresults = False #Make a graph of the planet positions? (Doesn't do well with lots of points)
+    # Savemotion = True #Save the position of all bodies to file?
+    # Path = True #Shows the trajectory of probe path
+    # BodyPaths =  True #graphresults #Whether to show the path of the bodies in the system or not
 
     Twin_period = math.pi*2*250/28.28427
     Twin_mass = 1.6*10**6
@@ -140,7 +140,7 @@ def main():
     RingWorld.surface_radius = 300
     RingWorld.visit_radius = 800
 
-    TheEye = OG.planet(286500,0,sun_mass,foci=OG.point(init_pos=[0,0,0]),name="The Eye",parent=Sun,mass = 9*10**6,i=1.463537779,omega=-0.4321431)
+    TheEye = OG.planet(286500,0,sun_mass,foci=OG.point(init_pos=[0,0,0]),name="The Eye",parent=Sun,mass = 9*10**6,i=1.463537779,omega=-0.4321431) #Change semi-major axis back to 286500 later
     TheEye.isGravityLinear = True #Just gonna assume this is so 
     TheEye.mass = 9*10**6
     TheEye.InitialMeanAnomaly = 1.532 #Adding this because I think the eye just happened to be in the shadow of GD
@@ -173,6 +173,7 @@ def main():
     #BodiesList = [Sun,CaveTwin,TowerTwin,TimberHearth,BrittleHollow,GiantsDeep,DarkBramble,Interloper,TheEye]
     if Savemotion:
         numofbody = len(BodiesList)
+        print(len(BodiesList))
         for i in range(numofbody):
             currentbody = BodiesList[i]
             np.save(f"Bodies/{i:03}",currentbody.Dataframe.filter(["time","x","y","z"],axis=1).to_numpy())
@@ -201,7 +202,7 @@ def main():
         df["x"] = pd.to_numeric(df["x"], errors="coerce")
         df["y"] = pd.to_numeric(df["y"], errors="coerce")
         df["z"] = pd.to_numeric(df["z"], errors="coerce")
-        range = [-300000,300000]
+        graphrange = [-300000,300000]
         colormap = {
             Sun.name:"#FFDF22",
             SunStation.name:"#9D00FF",
@@ -233,7 +234,7 @@ def main():
                 "body": np.full(len(path[:,0]),"Probe")
             })
             df = pd.concat([df,probeDF])
-        fig = px.scatter_3d(df,x="x",y="y",z="z",animation_frame="time",color="body",range_x=range,range_y=range,range_z=range,color_discrete_map=colormap)
+        fig = px.scatter_3d(df,x="x",y="y",z="z",animation_frame="time",color="body",range_x=graphrange,range_y=graphrange,range_z=graphrange,color_discrete_map=colormap)
         if BodyPaths:
             for body, group in df.groupby('body'): #Honestly this code is ChatGPT :(
                 fig.add_trace(go.Scatter3d(
@@ -262,3 +263,6 @@ def main():
         fig.update_scenes(aspectmode='cube') #Making the axes be a cube
 
         fig.show()
+if __name__ == "__main__":
+    #Makes it so python doesn't run this when importing it, thanks Python!
+    main()

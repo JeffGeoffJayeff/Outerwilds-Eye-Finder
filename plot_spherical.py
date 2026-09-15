@@ -785,7 +785,7 @@ def plot_cube_map_face(data,width:float,case:str): # This function is meant to w
 def main():
 
     """Main execution function."""
-    outputs_folder = Path("UniformDistEyeHasMass") #NOTE: Change this to the folder where your npy files are located
+    outputs_folder = Path("UniformDistDifferentLowerSpeed") #NOTE: Change this to the folder where your npy files are located
     print(f"Analyzing {outputs_folder}")
     if not outputs_folder.exists():
         print(f"Outputs folder not found at {outputs_folder.absolute()}")

@@ -25,7 +25,7 @@ sunBodyIndex = 0 #Index that is the Sun in the Bodies list
 NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
 n_sim_per_pikmin = 1000 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
 total_n_pikmin_to_make = 5000 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin  will run n_sim_per_pikmin simulations
-pikmin_on_field = 13 #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
+pikmin_on_field = 11 #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
 Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
 plotPath = True #Whether to plot or not
@@ -417,7 +417,7 @@ def simulationPikmin(cannonIndex:int,launchMag:float,bodiesList:list[Body],launc
     np.save(f"{filename}.npy",results)
     #np.savetxt(f"{filename}.csv",results,delimiter=",")
     return 
-def singleSimulation(files:list[str],launchMag:float,bodiesList:list[Body],launchUnitVector:np.ndarray,launchTime:float=0,timestep:float=1/60,endtime:float=22,printoutput:bool=False,displayPath:bool=False):
+def singleSimulation(files:list[str],launchMag:float,launchUnitVector:np.ndarray,launchTime:float=0,timestep:float=1/60,endtime:float=22,plotPath:bool=False):
     Bodies = [] #Create list to store bodies into 
     Names = []
     for i in range(0,len(files)): #Load in bodies
@@ -450,7 +450,7 @@ def singleSimulation(files:list[str],launchMag:float,bodiesList:list[Body],launc
         print("Using In-Game gravity")
 
 
-    singleProbe = probe(launchbodyindex=CannonIndex,launchvel=launchMag,Bodies=bodiesList,launchunitvector=launchUnitVector,launchtime=launchTime,endtime=endtime,timestep=timestep)
+    singleProbe = probe(launchbodyindex=CannonIndex,launchvel=launchMag,Bodies=Bodies,launchunitvector=launchUnitVector,launchtime=launchTime,endtime=endtime,timestep=timestep)
     singleProbe.runSimulation()
     singleProbe.printSimulationEvents()
     print(singleProbe.Results())
@@ -467,9 +467,9 @@ def singleSimulation(files:list[str],launchMag:float,bodiesList:list[Body],launc
             probepath[:,1:4] = singleProbe.path.y[[0,2,4],:].T
             if not np.isnan(singleProbe.eyeArrivalTime):
                 print(f"Time: {singleProbe.path.t_events[15]}, Cartesian Coordinates: {singleProbe.getXYZ(singleProbe.eyeArrivalTime)}, Spherical {cartToSpherical(singleProbe.getXYZ(singleProbe.eyeArrivalTime))}")
-            range = [-800000,800000]
+            graphrange = [-800000,800000]
             step = 60*1 #Step in stepsizes
-            fig = px.scatter_3d(x=probepath[:,1][::step],y=probepath[:,2][::step],z=probepath[:,3][::step],animation_frame=probepath[:,0][::step],range_x=range,range_y=range,range_z=range) #
+            fig = px.scatter_3d(x=probepath[:,1][::step],y=probepath[:,2][::step],z=probepath[:,3][::step],animation_frame=probepath[:,0][::step],range_x=graphrange,range_y=graphrange,range_z=graphrange) #
             fig.add_trace(go.Scatter3d(
                         x=probepath[:,1][::step],
                         y=probepath[:,2][::step],
@@ -592,9 +592,9 @@ else:
         probepath[:,1:4] = Test.path.y[[0,2,4],:].T
         if not np.isnan(Test.eyeArrivalTime):
             print(f"Time: {Test.path.t_events[15]}, Cartesian Coordinates: {Test.getXYZ(Test.eyeArrivalTime)}, Spherical {cartToSpherical(Test.getXYZ(Test.eyeArrivalTime))}")
-        range = [-800000,800000]
+        graphrange = [-800000,800000]
         step = 60*1 #Step in stepsizes
-        fig = px.scatter_3d(x=probepath[:,1][::step],y=probepath[:,2][::step],z=probepath[:,3][::step],animation_frame=probepath[:,0][::step],range_x=range,range_y=range,range_z=range) #
+        fig = px.scatter_3d(x=probepath[:,1][::step],y=probepath[:,2][::step],z=probepath[:,3][::step],animation_frame=probepath[:,0][::step],range_x=graphrange,range_y=graphrange,range_z=graphrange) #
         fig.add_trace(go.Scatter3d(
                     x=probepath[:,1][::step],
                     y=probepath[:,2][::step],

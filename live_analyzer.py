@@ -1,5 +1,5 @@
 # Program that lets the user type in commands to analyze data
-# V 0.1
+# V 0.2
 
 import re
 import numpy as np
@@ -8,6 +8,7 @@ from tabulate import tabulate #For making tables
 from plot_spherical import spherical_to_cartesian, cartesian_to_spherical
 from probe import resultsDType
 from probe import singleSimulation
+from SystemMovementCalculator import main as SMC
 
 eyeShellRadius = 286500 #The radius of the eye shell in meters https://www.reddit.com/r/outerwilds/comments/t7mxcy/how_far_away_is_the_eye_base_game_spoilers/
 
@@ -34,7 +35,8 @@ class terminal:
             "SortbyVisits": self.sortbyVisits,
             "SumVisits": self.sumVisits,
             "LookupLaunch": self.lookupLaunchConditions,
-            "LookupIndex": self.lookupIndex
+            "LookupIndex": self.lookupIndex,
+            "LaunchIndex": self.launchIndex
         }
         self.resultsFields = resultsDType
         self.visitFields = [
@@ -101,7 +103,7 @@ class terminal:
         else:
             print(f"ERROR: New data length {np.size(newData)} does not match dataset length {len(self.dataset)}")
             return
-        
+
     def calculateCartesian(self):
         shellx = np.cos(self.dataset['Eye Shell Polar']) * np.sin(self.dataset['Eye Shell Azimuth']) * eyeShellRadius
         shelly = np.sin(self.dataset['Eye Shell Polar']) * np.sin(self.dataset['Eye Shell Azimuth']) * eyeShellRadius
@@ -118,6 +120,23 @@ class terminal:
         self.addColumn("Final X",np.float64,finalx)
         self.addColumn("Final Y",np.float64,finaly)
         self.addColumn("Final Z",np.float64,finalz)
+    def launchIndex(self,index:int,plotPlanets:bool=False):
+        print("HIH")
+        index = int(index)
+        if index < 0 or index >= len(self.dataset):
+            print(f"ERROR: Index {index} is out of bounds for dataset of length {len(self.dataset)}")
+            return
+        unitx = self.dataset['Relative Launch x'][index]
+        unity = self.dataset['Relative Launch y'][index]
+        unitz = self.dataset['Relative Launch z'][index]
+        velocity = self.dataset['Relative Launch Velocity'][index]
+        print(f"Launching simulation at index {index} with the following parameters: \nLaunch velocity {velocity}\nUnit vector ({unitx}, {unity}, {unitz})")
+        bodiesfolder = Path("Bodies")
+        files = list(bodiesfolder.glob("*.npy"))
+        singleSimulation(files,velocity,np.array([unitx,unity,unitz]),0,1/60,22,not(plotPlanets))
+        if plotPlanets:
+            SMC(Stepsize = 1, EndMinute = 22,graphresults=True,Path=True,BodyPaths=True)
+
     def loadFile(self, filename):
         data = np.load(filename)
         self.dataset.append(data)
