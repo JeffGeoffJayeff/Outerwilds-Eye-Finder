@@ -111,7 +111,7 @@ class Body:
     def getVel(self,time:float):
         start = self.getXYZ(time)
         end = self.getXYZ(time+self.timestep)
-        vel = end - start
+        vel = (end - start)/self.timestep 
         return vel
     def converttoRealGravity(self):
         oldMass = self.mass
@@ -162,10 +162,7 @@ class probe:
             elif (body.air_radius > dist): #Inside the atmosphere
                 fluidvelocity = body.getVel(t)
                 relativefluidvel = shipvel - fluidvelocity
-                if np.isnan(body.has_water): #Don't do anything about water if it doesn't have any
-                    #Calculate air drag
-                    a += calculateDrag(relativefluidvel,body.air_density)
-                elif (body.water_radius > dist):
+                if (not(np.isnan(body.water_radius))) and body.water_radius > dist:
                     #Do water drag instead, the 30 is because water is defined to be 30
                     a += calculateDrag(relativefluidvel,30)
                 else:
@@ -454,7 +451,10 @@ def singleSimulation(files:list[str],launchMag:float,launchUnitVector:np.ndarray
     singleProbe.runSimulation()
     singleProbe.printSimulationEvents()
     print(singleProbe.Results())
-
+    probepath = np.zeros((len(singleProbe.path.t),4))
+    probepath[:,0] = singleProbe.path.t
+    probepath[:,1:4] = singleProbe.path.y[[0,2,4],:].T
+    np.save("probepath.npy",probepath)
     if plotPath:
         # Get Cartesian mesh grid
             sun_radius = 2000
@@ -462,9 +462,7 @@ def singleSimulation(files:list[str],launchMag:float,launchUnitVector:np.ndarray
             spherex = sun_radius*np.sin(spherephi) * np.cos(spheretheta)
             spherey = sun_radius*np.sin(spherephi) * np.sin(spheretheta)
             spherez = sun_radius*np.cos(spherephi)
-            probepath = np.zeros((len(singleProbe.path.t),4))
-            probepath[:,0] = singleProbe.path.t
-            probepath[:,1:4] = singleProbe.path.y[[0,2,4],:].T
+            
             if not np.isnan(singleProbe.eyeArrivalTime):
                 print(f"Time: {singleProbe.path.t_events[15]}, Cartesian Coordinates: {singleProbe.getXYZ(singleProbe.eyeArrivalTime)}, Spherical {cartToSpherical(singleProbe.getXYZ(singleProbe.eyeArrivalTime))}")
             graphrange = [-800000,800000]
@@ -480,7 +478,7 @@ def singleSimulation(files:list[str],launchMag:float,launchUnitVector:np.ndarray
             fig.add_surface(x=spherex, y=spherey, z=spherez, opacity=1.0,showscale=False)
             fig.update_scenes(aspectmode='cube') #Making the axes be a cube
             fig.show()
-            np.save("probepath.npy",probepath)
+            
 
 
 if Mass_Simulation_Mode:

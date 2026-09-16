@@ -121,7 +121,6 @@ class terminal:
         self.addColumn("Final Y",np.float64,finaly)
         self.addColumn("Final Z",np.float64,finalz)
     def launchIndex(self,index:int,plotPlanets:bool=False):
-        print("HIH")
         index = int(index)
         if index < 0 or index >= len(self.dataset):
             print(f"ERROR: Index {index} is out of bounds for dataset of length {len(self.dataset)}")
