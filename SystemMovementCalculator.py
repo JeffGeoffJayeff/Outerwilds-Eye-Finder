@@ -29,6 +29,8 @@ def main(sun_mass=4*10**11,sun_radius=2000,Stepsize=1/60,EndMinute=23,graphresul
     Sun.createDataFrame(endminute=EndMinute,stepsize=Stepsize)
     Sun.surface_radius = sun_radius
     Sun.visit_radius = 4500
+    Sun.air_radius = 3000
+    Sun.air_density = 0.1
 
     SunStation = OG.planet(50,0,sun_mass,name="Sun Station",parent=Sun)
     SunStation.surface_radius = 20
@@ -227,7 +229,7 @@ def main(sun_mass=4*10**11,sun_radius=2000,Stepsize=1/60,EndMinute=23,graphresul
             step = 60
             path = np.load("probepath.npy")[::int(step)]
             probeDF = pd.DataFrame({
-                "time":path[:,0],
+                "time":np.round(path[:,0],1),
                 "x":path[:,1],
                 "y":path[:,2],
                 "z":path[:,3],
@@ -265,4 +267,4 @@ def main(sun_mass=4*10**11,sun_radius=2000,Stepsize=1/60,EndMinute=23,graphresul
         fig.show()
 if __name__ == "__main__":
     #Makes it so python doesn't run this when importing it, thanks Python!
-    main()
+    main(Savemotion=True)

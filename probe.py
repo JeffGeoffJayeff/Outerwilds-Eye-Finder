@@ -18,14 +18,14 @@ import multiprocessing as mp
 Properties = pd.read_pickle("Properties.pkl")
 bodiesfolder = Path("Bodies")
 files = list(bodiesfolder.glob("*.npy"))
-outputdir = "UniformDistDifferentLowerSpeed"
+outputdir = "Simulations/launchtimetest"
 G = 10**-3
 eye_distance = 286500 #Distance of the eye from the sun in meters https://www.reddit.com/r/outerwilds/comments/t7mxcy/how_far_away_is_the_eye_base_game_spoilers/
 sunBodyIndex = 0 #Index that is the Sun in the Bodies list
 NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
-n_sim_per_pikmin = 1000 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
-total_n_pikmin_to_make = 5000 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin  will run n_sim_per_pikmin simulations
-pikmin_on_field = 11 #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
+n_sim_per_pikmin = 200 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
+total_n_pikmin_to_make = 7000 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin  will run n_sim_per_pikmin simulations
+pikmin_on_field = 10 #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
 Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
 plotPath = True #Whether to plot or not
@@ -39,6 +39,7 @@ resultsDType = [ #Used in results template
             ("Global Launch z",np.float64),
             ("Relative Launch Velocity",np.float32),
             ("Global Launch Velocity",np.float32),
+            ("Launch Time",np.float32), #Time of launch in seconds
             ("Reached Eye",np.bool_),
             ("Eye Shell Time",np.float32), #The time the probe reaches 286 km or whatever it is
             ("Eye Shell Polar",np.float64), #The polar of the above point
@@ -126,7 +127,7 @@ class probe:
         self.launchvector = self.direction*self.launch_velocity_mag #Launch velocity vector
         self.initialvel = self.findLaunchVelVec(launchtime,self.launchvector) #Launch velocity vector accounting for the initial motion of the launch body
         self.path = None
-        self.launchtime = launchtime #When the probe is launched
+        self.launchtime = launchtime #When the probe is launched in seconds
         self.endtime = endtime #When to end simulation, in minutes
         self.timestep = timestep 
         self.Bodies = Bodies
@@ -157,9 +158,13 @@ class probe:
             else:
                 a += G * body.mass * diff / dist**3
             #Acceleration due to drag
-            if np.isnan(body.air_radius): 
+            if body.name == "Sun": #Sun's atmosphere expands in the loop
+                airradius = calculateSunAtmosphereRadius(t)
+            else:
+                airradius = body.air_radius
+            if np.isnan(airradius): #If the body doesn't have an atmosphere then we don't need to do drag calculations
                 continue
-            elif (body.air_radius > dist): #Inside the atmosphere
+            elif (airradius > dist): #Inside the atmosphere
                 fluidvelocity = body.getVel(t)
                 relativefluidvel = shipvel - fluidvelocity
                 if (not(np.isnan(body.water_radius))) and body.water_radius > dist:
@@ -220,14 +225,14 @@ class probe:
             self.events.append(self.make_hitBody_event()) #Add hitting event
         if printoutput:
             print("Running simulation...")
-        self.path = solve_ivp(self.dSdt, [self.launchtime,(self.endtime)*60],y0 = [initXYZ[0],self.initialvel[0],initXYZ[1],self.initialvel[1],initXYZ[2],self.initialvel[2]],t_eval=np.arange(0,(self.endtime)*60,self.timestep),events=self.events)
+        self.path = solve_ivp(self.dSdt, [self.launchtime,(self.endtime)*60],y0 = [initXYZ[0],self.initialvel[0],initXYZ[1],self.initialvel[1],initXYZ[2],self.initialvel[2]],t_eval=np.arange(self.launchtime,(self.endtime)*60,self.timestep),events=self.events)
         if printoutput:
             print("Simulation done!")
     def getXYZ(self,time:float): #TODO: Some more input handling should be added to this
         if self.path == None:
             print("ERROR: Can't get XYZ as simulation has not been run yet!")
             return
-        estimatedindex = time/self.timestep 
+        estimatedindex = (time - self.launchtime)/self.timestep
         np.clip(estimatedindex,0,(len(self.path.t)-1)) #Keep index in range
         index = math.trunc(estimatedindex) #Just going to round down
         if index < (len(self.path.t)-1): #Do some linear interpolation as long as it isn't the last entry
@@ -255,6 +260,7 @@ class probe:
         output.extend(self.initialvel/np.linalg.norm(self.initialvel)) #Adding Global Launch unit XYZ
         output.append(self.launch_velocity_mag) #Adding Relative launch velocity
         output.append(np.linalg.norm(self.initialvel)) #Adding Global launch velocity
+        output.append(self.launchtime) #Adding Launch time
         output.append(self.arrivedAtEye) #Eye Tracking stuff
         if self.arrivedAtEye: 
             output.append(self.eyeArrivalTime)
@@ -363,6 +369,13 @@ def calculateSunRadius(t):
         return 3.33333*t+200
     else:
         return 4000
+def calculateSunAtmosphereRadius(t):
+    if t < 10*60:
+        return 3000
+    elif ((10*60 <= t) and (t<19*60)): #Sun goes from radius of 4000 to 5000 over 9 minutes, assuming linear growth
+        return 2000/540*t + 777.7777777777778
+    else:
+        return 5000
 def random_3d_unit_vector(): #https://mathworld.wolfram.com/SpherePointPicking.html
     #phi = np.random.uniform(0,np.pi*2) #np.random.uniform(5.463,6.283+0.154)% (np.pi*2) #
     #theta = np.random.uniform(0,np.pi) # np.random.uniform(1.183,1.958)
@@ -415,6 +428,7 @@ def simulationPikmin(cannonIndex:int,launchMag:float,bodiesList:list[Body],launc
     #np.savetxt(f"{filename}.csv",results,delimiter=",")
     return 
 def singleSimulation(files:list[str],launchMag:float,launchUnitVector:np.ndarray,launchTime:float=0,timestep:float=1/60,endtime:float=22,plotPath:bool=False):
+    #Files is a list of file paths to the .npy files that contain the body data
     Bodies = [] #Create list to store bodies into 
     Names = []
     for i in range(0,len(files)): #Load in bodies
@@ -467,7 +481,7 @@ def singleSimulation(files:list[str],launchMag:float,launchUnitVector:np.ndarray
                 print(f"Time: {singleProbe.path.t_events[15]}, Cartesian Coordinates: {singleProbe.getXYZ(singleProbe.eyeArrivalTime)}, Spherical {cartToSpherical(singleProbe.getXYZ(singleProbe.eyeArrivalTime))}")
             graphrange = [-800000,800000]
             step = 60*1 #Step in stepsizes
-            fig = px.scatter_3d(x=probepath[:,1][::step],y=probepath[:,2][::step],z=probepath[:,3][::step],animation_frame=probepath[:,0][::step],range_x=graphrange,range_y=graphrange,range_z=graphrange) #
+            fig = px.scatter_3d(x=probepath[:,1][::step],y=probepath[:,2][::step],z=probepath[:,3][::step],animation_frame=np.round(probepath[:,0][::step],1),range_x=graphrange,range_y=graphrange,range_z=graphrange) #
             fig.add_trace(go.Scatter3d(
                         x=probepath[:,1][::step],
                         y=probepath[:,2][::step],
@@ -528,7 +542,9 @@ if Mass_Simulation_Mode:
         
         with mp.Pool(processes=pikmin_on_field) as pool:
             for _  in range(total_n_pikmin_to_make):
-                pool.apply_async(simulationPikmin, args=(CannonIndex, None, Bodies, unitvec, 0, 1/60, 22, n_sim_per_pikmin, outputdir, True,250,500))
+                pool.apply_async(simulationPikmin, args=(CannonIndex,None, Bodies, unitvec, 20, 1/60, 22, n_sim_per_pikmin, outputdir, True,250,500))
+                #def simulationPikmin(cannonIndex:int,launchMag:float,bodiesList:list[Body],launchUnitVector:np.ndarray,launchTime:float,timestep:float,endtime:float,n_sims:int,outputdir:str,printoutput:bool=False,minLaunchMag:float=250,maxLaunchMag:float=1000):
+                #NOTE: This is where you change the settings for mass simulation mode
             pool.close()
             pool.join()
         print("All pikmin have finished their simulations.")
@@ -573,7 +589,7 @@ else:
     print(mag)
     #calculateDragTest()
     ## Probe Simulation
-    Test = probe(CannonIndex,mag,Bodies,np.asarray(unitvec),0,timestep=1/60,endtime=22)
+    Test = probe(CannonIndex,mag,Bodies,np.asarray(unitvec),launchtime=20,timestep=1/60,endtime=22)
     Test.runSimulation()
     Test.printSimulationEvents()
     print(Test.Results())

@@ -132,7 +132,11 @@ class terminal:
         print(f"Launching simulation at index {index} with the following parameters: \nLaunch velocity {velocity}\nUnit vector ({unitx}, {unity}, {unitz})")
         bodiesfolder = Path("Bodies")
         files = list(bodiesfolder.glob("*.npy"))
-        singleSimulation(files,velocity,np.array([unitx,unity,unitz]),0,1/60,22,not(plotPlanets))
+        if "Launch Time" not in self.dataset.dtype.names:
+            launchtime = 0
+        else:
+            launchtime = self.dataset['Launch Time'][index]
+        singleSimulation(files,velocity,np.array([unitx,unity,unitz]),launchtime,1/60,22,not(plotPlanets))
         if plotPlanets:
             SMC(Stepsize = 1, EndMinute = 22,graphresults=True,Path=True,BodyPaths=True)
 
@@ -188,13 +192,19 @@ class terminal:
         else: 
             print("ERROR: Invalid search type, must be either 'final' or 'eye'")
             return
+
+        if 'Launch Time' not in self.dataset.dtype.names:
+            time = 0 # If the launch time column doesn't exist then assume it is 0, this is for older datasets that don't have the launch time column
+        else:
+            time = self.dataset['Launch Time'][index]
+
         print("Outputting results...")
         unitx = self.dataset['Relative Launch x'][index]
         unity = self.dataset['Relative Launch y'][index]
         unitz = self.dataset['Relative Launch z'][index]
         velocity = self.dataset['Relative Launch Velocity'][index]
-        print(f"Closest simulation to point ({x},{y},{z}) is at index {index} with the following parameters: \nDistance to point: {self.dataset['Distance to Point'][index]}\nLaunch velocity {velocity}\nUnit vector ({unitx}, {unity}, {unitz})")
-        return np.array([unitx,unity,unitz,velocity,index])
+        print(f"Closest simulation to point ({x},{y},{z}) is at index {index} with the following parameters: \nDistance to point: {self.dataset['Distance to Point'][index]}\nLaunch velocity: {velocity}\nUnit vector: ({unitx}, {unity}, {unitz})\nLaunch time: {time} seconds")
+        return np.array([unitx,unity,unitz,velocity,index,time])
     
     def helpCommand(self):
         print("Current Commands:")
@@ -222,21 +232,21 @@ class terminal:
         else:
             print("No data to save")
     def sortbyVisits(self, name:str="total"):
-        if name.casefold() == "total":
-            if any(self.totalVisitsName != name for name in self.dataset.dtype.names):
+        if name.casefold() == "total": #Sort by total visits
+            if not any(self.totalVisitsName == i for i in self.dataset.dtype.names):
                 print(f"{self.totalVisitsName} not found, calculating sum of visits...")
                 self.sumVisits()
             print("Sorting dataset by total visits in descending order...")
             self.dataset = self.dataset[np.argsort(self.dataset[self.totalVisitsName])[::-1]]
             print("Dataset sorted by total visits in descending order")
-        elif name.casefold() == "nosun":
-            if any(self.totalVisitsName != name for name in self.dataset.dtype.names):
+        elif name.casefold() == "nosun": #Sort by total visits excluding sun
+            if not any(self.totalVisitsName == i for i in self.dataset.dtype.names):
                 print(f"{self.totalVisitsName} not found, calculating sum of visits...")
                 self.sumVisits()
             print("Sorting dataset by total visits excluding sun in descending order...")
             self.dataset = self.dataset[np.argsort(self.dataset[self.totalVisitsName] - self.dataset[self.visitFieldsandBody["sun"]])[::-1]]
             print("Dataset sorted by total visits excluding sun in descending order")
-        elif name.casefold() in self.visitFieldsandBody:
+        elif name.casefold() in self.visitFieldsandBody: #Uses the visitFieldsandBody dictionary to find the correct field name for the body
             field = self.visitFieldsandBody[name.casefold()]
             self.dataset = self.dataset[np.argsort(self.dataset[field])[::-1]]
             print(f"Dataset sorted by visits to {name} in descending order")
