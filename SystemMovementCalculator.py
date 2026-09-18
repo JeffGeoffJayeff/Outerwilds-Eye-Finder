@@ -9,7 +9,7 @@ import pandas as pd
 # Purpose: The point of this file is to calculate the position of each body at a specific time, and output them to a file 
 # These files are the ones in "Bodies"
 # It also graphs their positions as refactoring it into a separate program is an entire thing
-def main(sun_mass=4*10**11,sun_radius=2000,Stepsize=1/60,EndMinute=23,graphresults=False,Savemotion=False,Path=True,BodyPaths=True):
+def main(sun_mass=4*10**11,sun_radius=2000,Stepsize=1/60,EndMinute=23,graphresults:bool=False,Savemotion:bool=False,Path:bool=True,BodyPaths:bool=True,PlotAllProbes:bool = False):
     G = 1*10**(-3) #Gravitational Constant
     # sun_mass = 4*10**11
     # sun_radius = 2000
@@ -227,7 +227,7 @@ def main(sun_mass=4*10**11,sun_radius=2000,Stepsize=1/60,EndMinute=23,graphresul
         }
         if Path:
             step = 60
-            path = np.load("probepath.npy")[::int(step)]
+            path = np.load("ProbePaths/tempProbePath.npy")[::int(step)]
             probeDF = pd.DataFrame({
                 "time":np.round(path[:,0],1),
                 "x":path[:,1],
@@ -257,7 +257,17 @@ def main(sun_mass=4*10**11,sun_radius=2000,Stepsize=1/60,EndMinute=23,graphresul
                 mode='lines',
                 name="probe trajectory",
             ))
-        fig.add_surface(x=spherex, y=spherey, z=spherez, opacity=1.0,showscale=False)
+        elif PlotAllProbes:
+            for i in range(10):
+                path = np.load(f"ProbePaths/ProbePath{i:03}.npy")[::int(step)]
+                fig.add_trace(go.Scatter3d(
+                    x=path[:,1],
+                    y=path[:,2],
+                    z=path[:,3],
+                    mode='lines',
+                    name=f"probe trajectory {i}",
+                ))
+        fig.add_surface(x=spherex, y=spherey, z=spherez, opacity=1.0,showscale=False) #Adding Sun
 
         # Speeding up animation, don't know if this works
         fig.layout.updatemenus[0].buttons[0].args[1]['frame']['duration'] = 10   # Speed of frame display

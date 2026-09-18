@@ -473,6 +473,10 @@ def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell 
     radius = np.array(data[radius], dtype=float)
     t = np.array(data[eyeshell], dtype=float)  # Assuming there's a time field for color mapping
     body = np.array(data[body_hit], dtype=float)
+    has_uuid = data.dtype.names is not None and 'UUID' in data.dtype.names
+    point_label = 'UUID' if has_uuid else 'Point Index'
+    point_ids = (np.array(data['UUID'], dtype=str) if has_uuid
+                 else np.arange(len(data)).astype(str))
 
     # Convert spherical to Cartesian coordinates
     x, y, z = spherical_to_cartesian(polar, azimuth, radius=radius)
@@ -487,6 +491,7 @@ def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell 
     z = z[arr]
     t = t[arr]
     body=body[arr]
+    point_ids = point_ids[arr]
     df = pd.DataFrame({ #Take random samples 
         'x': x,
         'y': y,
@@ -510,9 +515,11 @@ def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell 
         y_valid = y[np.isfinite(t)]
         z_valid = z[np.isfinite(t)]
         t_valid = t[np.isfinite(t)]
+        uuid_valid = point_ids[np.isfinite(t)]
         
         fig.add_trace(go.Scatter3d(
             x=x_valid, y=y_valid, z=z_valid,
+            customdata=uuid_valid,
             mode='markers',
             marker=dict(
                 size=2,
@@ -522,6 +529,7 @@ def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell 
                 colorbar=dict(title="Eye Shell Time", x=1.1),
             ),
             name='Valid Points',
+            hovertemplate=f'{point_label}: %{{customdata}}<br>Eye Shell Time: %{{marker.color}}<extra></extra>',
             opacity=1
         ))
     # Endless Orbit: Probes that just orbit the system and never hit anything
@@ -529,15 +537,18 @@ def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell 
     x_orbit = x[mask]
     y_orbit = y[mask]
     z_orbit = z[mask]
+    uuid_orbit = point_ids[mask]
     fig.add_trace(go.Scatter3d(
         x=x_orbit,
         y=y_orbit,
         z=z_orbit,
+        customdata=uuid_orbit,
         mode='markers',
         name="Orbiter",
         marker=dict(size=2, color='black'),
         legendgroup='orbit',
         showlegend=True,
+        hovertemplate=f'{point_label}: %{{customdata}}<extra></extra>',
     ))
 
     # Probes that hit something 
@@ -546,6 +557,7 @@ def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell 
         y_nan = y[np.isfinite(body)]
         z_nan = z[np.isfinite(body)]
         body_hit = body[np.isfinite(body)]
+        uuid_nan = point_ids[np.isfinite(body)]
         
         # Map Body Hit indices to color names
         if body_hit_colors is None:
@@ -561,18 +573,22 @@ def plot_distance(data, polar_field='Eye Shell Polar', azimuth_field='Eye Shell 
             'x': x_nan, 
             'y': y_nan,
             'z': z_nan,
-            'body': body_hit
+            'body': body_hit,
+            'uuid': uuid_nan
         })
         for body, group in df.groupby('body'):
             fig.add_trace(go.Scatter3d(
                 x=group['x'],
                 y=group['y'],
                 z=group['z'],
+                customdata=group['uuid'],
                 mode='markers',
                 name=f"hit {body}",
                 marker=dict(size=2, color=body_hit_colors[body],opacity=1),
                 legendgroup=body,   # ties it to the same legend entry
                 showlegend=True,
+                hovertemplate=f'{point_label}: %{{customdata}}<br>Body Hit: %{{text}}<extra></extra>',
+                text=group['body'],
             ))
 
     #fig = px.scatter_3d(df, x='x', y='y', z='z', color='t')

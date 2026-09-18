@@ -2,6 +2,7 @@
 # V 0.2
 
 import re
+import uuid
 import numpy as np
 from pathlib import Path
 from tabulate import tabulate #For making tables 
@@ -35,10 +36,8 @@ class terminal:
             "SortbyVisits": self.sortbyVisits,
             "SumVisits": self.sumVisits,
             "LookupLaunch": self.lookupLaunchConditions,
-            "LaunchIndex": self.launchIndex,
-            "LookupIndex": self.lookupIndex,
-            "LaunchUUID": self.launchUUID,
-            "LookupUUID": self.lookupUUID
+            "LaunchbyID": self.launchbyID,
+            "LookupbyID": self.lookupbyID
         }
         self.resultsFields = resultsDType
         self.visitFields = [
@@ -122,6 +121,16 @@ class terminal:
         self.addColumn("Final X",np.float64,finalx)
         self.addColumn("Final Y",np.float64,finaly)
         self.addColumn("Final Z",np.float64,finalz)
+    def launchbyID(self,identifier:str,plotPlanets:bool=False):
+        IDType = UUIDorIndex(identifier)
+        if IDType == None:
+            print(f"ERROR: {identifier} is neither a valid index nor a valid UUID")
+        elif IDType == "index":
+            self.launchIndex(int(identifier),plotPlanets)
+        elif IDType == "uuid":
+            self.launchUUID(identifier,plotPlanets)
+        else:
+            print("ERROR: Unknown ID type")
     def launchIndex(self,index:int,plotPlanets:bool=False):
         index = int(index)
         if index < 0 or index >= len(self.dataset):
@@ -168,6 +177,16 @@ class terminal:
             self.dataset = combinedData
         self.simulations += np.size(combinedData,0)
         print(f"Folder {foldername} loaded with {len(seperateData):,d} files and {np.size(combinedData,0):,d} simulations\nTotal number of simulations: {self.simulations:,d}")
+    def lookupbyID(self,identifier:str):
+        IDType = UUIDorIndex(identifier)
+        if IDType == None:
+            print(f"ERROR: {identifier} is neither a valid index nor a valid UUID")
+        elif IDType == "index":
+            self.lookupIndex(int(identifier))
+        elif IDType == "uuid":
+            self.lookupUUID(identifier)
+        else:
+            print("ERROR: Unknown ID type")
     def lookupIndex(self,index:int):
         index = int(index)
         if index < 0 or index >= len(self.dataset):
@@ -330,6 +349,17 @@ class terminal:
         print(outputTable)
         print(f"Of {self.simulations:,} simulations, {self.dataset['Hit Something'].sum():,} simulations hit something, for a total hit rate of {self.dataset['Hit Something'].sum()/self.simulations*100:.3f}%")
         print(f"Of {self.simulations:,} simulations, {self.dataset['Reached Eye'].sum():,} simulations reached the eye shell, for a total reach rate of {self.dataset['Reached Eye'].sum()/self.simulations*100:.3f}%")
+def UUIDorIndex(input:str):
+    try:
+        index = int(input)
+        return "index"
+    except ValueError:
+        try:
+            uuid_obj = uuid.UUID(input)
+            return "uuid"
+        except ValueError:
+            print(f"ERROR: {input} is neither a valid index nor a valid UUID")
+            return None
 def main():
     print("Start of session")
     termGuy = terminal()

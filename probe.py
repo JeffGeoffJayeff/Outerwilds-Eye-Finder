@@ -26,7 +26,7 @@ sunBodyIndex = 0 #Index that is the Sun in the Bodies list
 NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
 n_sim_per_pikmin = 2000 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
 total_n_pikmin_to_make = 1000 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin  will run n_sim_per_pikmin simulations
-pikmin_on_field = 14 #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
+pikmin_on_field = 8 #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
 Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
 plotPath = True #Whether to plot or not
@@ -137,6 +137,7 @@ class probe:
         self.timestep = timestep 
         self.Bodies = Bodies
         self.events = [] #List of event functions to be used in the solve_ivp function
+        self.UUID = str(uuid.uuid4())
     ## Setting Up Simulation
     def findLaunchVelVec(self,t,launchvel:np.ndarray=[0,0,0]): #Find the global cartesian vector components for launching from a body at a specific time
         return self.launchbody.getVel(t) + launchvel
@@ -147,6 +148,7 @@ class probe:
         self.direction = launchunitvector #Unit vector of direction of launch velocity
         self.launchvector = self.direction*self.launch_velocity_mag #Launch velocity vector
         self.initialvel = self.findLaunchVelVec(launchtime,self.launchvector) #Launch velocity vector accounting for the initial motion of the launch body
+        self.UUID = str(uuid.uuid4()) #Change UUID
     ## Simulation Functions
     def netAcceleration(self,t,S):
         shippos = np.array([S[0],S[2],S[4]]) #This may be very perfomant but I'm not thinking about that rn
@@ -267,7 +269,7 @@ class probe:
         output.append(self.launch_velocity_mag) #Adding Relative launch velocity
         output.append(np.linalg.norm(self.initialvel)) #Adding Global launch velocity
         output.append(self.launchtime) #Adding Launch time
-        output.append(str(uuid.uuid4())) #Adding UUID, would prefer for it to be UUID 7 but thats in a newer python version and I don't know how to update this virtual environment for that to work :(, doing it bytes because it doubles the filesize as a string, actually having it been in bytes adds more handling so it shall be a string
+        output.append(self.UUID) #Adding UUID, would prefer for it to be UUID 7 but thats in a newer python version and I don't know how to update this virtual environment for that to work :(, doing it bytes because it doubles the filesize as a string, actually having it been in bytes adds more handling so it shall be a string
         output.append(self.arrivedAtEye) #Eye Tracking stuff
         if self.arrivedAtEye: 
             output.append(self.eyeArrivalTime)
@@ -439,7 +441,7 @@ def simulationPikmin(cannonIndex:int,launchMag:float,bodiesList:list[Body],launc
     np.save(f"{filename}.npy",results)
     #np.savetxt(f"{filename}.csv",results,delimiter=",")
     return 
-def singleSimulation(files:list[str],launchMag:float,launchUnitVector:np.ndarray,launchTime:float=0,timestep:float=1/60,endtime:float=22,plotPath:bool=False):
+def singleSimulation(files:list[str],launchMag:float,launchUnitVector:np.ndarray,launchTime:float=0,timestep:float=1/60,endtime:float=22,plotPath:bool=False,printoutput:bool=True,UUID:str=None):
     #Files is a list of file paths to the .npy files that contain the body data
     Bodies = [] #Create list to store bodies into 
     Names = []
@@ -451,36 +453,46 @@ def singleSimulation(files:list[str],launchMag:float,launchUnitVector:np.ndarray
         if Bodies[i].name == "Cannon":
             CannonIndex = i
     if NormalGravityforAll: #Change masses to have the same surface gravity as in the linear gravity system
-        print("Changing masses for Newtonian gravitation...")
+        if printoutput:
+            print("Changing masses for Newtonian gravitation...")
         for i in range(len(Bodies)):
             CurrentBody = Bodies[i]
             if CurrentBody.isGravityLinear == True: #Just making this explicit here
                 if np.isnan(CurrentBody.mass):
-                    print(f"{CurrentBody.name} has NAN mass, skipping")
+                    if printoutput:
+                        print(f"{CurrentBody.name} has NAN mass, skipping")
                     continue
                 if np.isnan(CurrentBody.surface_radius):
-                    print(f"{CurrentBody.name} has no surface, skipping")
+                    if printoutput:
+                        print(f"{CurrentBody.name} has no surface, skipping")
                     continue #Avoiding issues with NANs
                 elif CurrentBody.surface_radius == 0:
-                    print(f"{CurrentBody.name} has a surface radius of 0, skipping")
+                    if printoutput:
+                        print(f"{CurrentBody.name} has a surface radius of 0, skipping")
                     continue
                 else:
                     CurrentBody.converttoRealGravity()
             else:
-                print(f"{CurrentBody.name} already has Newtonian gravity")
+                if printoutput:
+                    print(f"{CurrentBody.name} already has Newtonian gravity")
                 continue
     else:
-        print("Using In-Game gravity")
+        if printoutput:
+            print("Using In-Game gravity")
 
 
     singleProbe = probe(launchbodyindex=CannonIndex,launchvel=launchMag,Bodies=Bodies,launchunitvector=launchUnitVector,launchtime=launchTime,endtime=endtime,timestep=timestep)
     singleProbe.runSimulation()
-    singleProbe.printSimulationEvents()
-    print(singleProbe.Results())
+    #singleProbe.printSimulationEvents()
+    if UUID is not None:
+        singleProbe.UUID = UUID #This is for in live_analyzer where an UUID is already made and we want to use that instead of making a new one
+    if printoutput:
+        print(singleProbe.Results())
     probepath = np.zeros((len(singleProbe.path.t),4))
     probepath[:,0] = singleProbe.path.t
     probepath[:,1:4] = singleProbe.path.y[[0,2,4],:].T
-    np.save("probepath.npy",probepath)
+    np.save(f"ProbePaths/{singleProbe.UUID}.npy",probepath)
+    print(f"Simulation results saved to ProbePaths/{singleProbe.UUID}.npy")
     if plotPath:
         # Get Cartesian mesh grid
             sun_radius = 2000
@@ -490,7 +502,8 @@ def singleSimulation(files:list[str],launchMag:float,launchUnitVector:np.ndarray
             spherez = sun_radius*np.cos(spherephi)
             
             if not np.isnan(singleProbe.eyeArrivalTime):
-                print(f"Time: {singleProbe.path.t_events[15]}, Cartesian Coordinates: {singleProbe.getXYZ(singleProbe.eyeArrivalTime)}, Spherical {cartToSpherical(singleProbe.getXYZ(singleProbe.eyeArrivalTime))}")
+                if printoutput:
+                    print(f"Time: {singleProbe.path.t_events[15]}, Cartesian Coordinates: {singleProbe.getXYZ(singleProbe.eyeArrivalTime)}, Spherical {cartToSpherical(singleProbe.getXYZ(singleProbe.eyeArrivalTime))}")
             graphrange = [-800000,800000]
             step = 60*1 #Step in stepsizes
             fig = px.scatter_3d(x=probepath[:,1][::step],y=probepath[:,2][::step],z=probepath[:,3][::step],animation_frame=np.round(probepath[:,0][::step],1),range_x=graphrange,range_y=graphrange,range_z=graphrange) #
@@ -631,7 +644,7 @@ else:
         fig.add_surface(x=spherex, y=spherey, z=spherez, opacity=1.0,showscale=False)
         fig.update_scenes(aspectmode='cube') #Making the axes be a cube
         fig.show()
-        np.save("probepath.npy",probepath)
+        np.save("ProbePaths/tempProbePath.npy",probepath)
 
     
     
