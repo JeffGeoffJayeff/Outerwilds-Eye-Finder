@@ -13,6 +13,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from multiprocessing import Pool
 import multiprocessing as mp 
+import uuid
 
 #np.seterr(all='raise')
 Properties = pd.read_pickle("Properties.pkl")
@@ -24,7 +25,7 @@ eye_distance = 286500 #Distance of the eye from the sun in meters https://www.re
 sunBodyIndex = 0 #Index that is the Sun in the Bodies list
 NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
 n_sim_per_pikmin = 2000 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
-total_n_pikmin_to_make = 7000 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin  will run n_sim_per_pikmin simulations
+total_n_pikmin_to_make = 1000 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin  will run n_sim_per_pikmin simulations
 pikmin_on_field = 14 #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
 Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
@@ -40,6 +41,7 @@ resultsDType = [ #Used in results template
             ("Relative Launch Velocity",np.float32),
             ("Global Launch Velocity",np.float32),
             ("Launch Time",np.float32), #Time of launch in seconds
+            ("UUID","U36"), #Unique identifier for the simulation
             ("Reached Eye",np.bool_),
             ("Eye Shell Time",np.float32), #The time the probe reaches 286 km or whatever it is
             ("Eye Shell Polar",np.float64), #The polar of the above point
@@ -264,6 +266,7 @@ class probe:
         output.append(self.launch_velocity_mag) #Adding Relative launch velocity
         output.append(np.linalg.norm(self.initialvel)) #Adding Global launch velocity
         output.append(self.launchtime) #Adding Launch time
+        output.append(str(uuid.uuid4())) #Adding UUID, would prefer for it to be UUID 7 but thats in a newer python version and I don't know how to update this virtual environment for that to work :(, doing it bytes because it doubles the filesize as a string, actually having it been in bytes adds more handling so it shall be a string
         output.append(self.arrivedAtEye) #Eye Tracking stuff
         if self.arrivedAtEye: 
             output.append(self.eyeArrivalTime)

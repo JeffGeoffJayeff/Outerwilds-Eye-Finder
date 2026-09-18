@@ -143,7 +143,6 @@ class terminal:
     def loadFile(self, filename):
         data = np.load(filename)
         self.dataset.append(data)
-
     def loadFolder(self, foldername): #TODO: Check that folder exists before doing this
         print(f"Loading folder {foldername}...",end="")
         npy_files = list(Path(foldername).glob("*.npy"))

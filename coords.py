@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import uuid
 
 angles = np.asarray(list(range(-45,50,5))) 
 print(angles)
@@ -12,3 +13,5 @@ y = np.round(y)/16
 
 for i in range(len(angles)):
     print(f"Angle:{angles[i]} - X:{x[i]} - Y:{y[i]}")
+
+print(uuid.uuid4())
