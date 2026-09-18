@@ -138,7 +138,7 @@ class terminal:
             launchtime = self.dataset['Launch Time'][index]
         singleSimulation(files,velocity,np.array([unitx,unity,unitz]),launchtime,1/60,22,not(plotPlanets))
         if plotPlanets:
-            SMC(Stepsize = 1, EndMinute = 22,graphresults=True,Path=True,BodyPaths=True)
+            SMC(Stepsize = 1, EndMinute = 22,graphresults=True,Path=True,BodyPaths=False)
 
     def loadFile(self, filename):
         data = np.load(filename)

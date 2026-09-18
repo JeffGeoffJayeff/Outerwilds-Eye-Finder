@@ -18,14 +18,14 @@ import multiprocessing as mp
 Properties = pd.read_pickle("Properties.pkl")
 bodiesfolder = Path("Bodies")
 files = list(bodiesfolder.glob("*.npy"))
-outputdir = "Simulations/launchtimetest"
+outputdir = "Simulations/0FrontFixedGravity250-500"
 G = 10**-3
 eye_distance = 286500 #Distance of the eye from the sun in meters https://www.reddit.com/r/outerwilds/comments/t7mxcy/how_far_away_is_the_eye_base_game_spoilers/
 sunBodyIndex = 0 #Index that is the Sun in the Bodies list
 NormalGravityforAll = True #This controls whether gravity is calculated using Newtonian gravity, or if it uses the so called linear gravity https://www.youtube.com/watch?v=dpKUoWgRBSU
-n_sim_per_pikmin = 200 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
+n_sim_per_pikmin = 2000 #number of simulations to run per pikmin, where a pikmin is a multiprocessing worker, multiple launches is done per worker to reduce the overhead of starting a new process for each launch
 total_n_pikmin_to_make = 7000 #Total number of pikmin to make, this is the total number of processes that will be made, each pikmin  will run n_sim_per_pikmin simulations
-pikmin_on_field = 10 #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
+pikmin_on_field = 14 #Number of pikmin to run at once, this is the number of processes that will be running at once, if this is set to 1 then it will run in serial, if it is set to 4 then it will run 4 simulations at once, and so on, based on cores or something
 Mass_Simulation_Mode = True #Whether or not you are simulating one or multiple launches
 # If True then the mass for each planet is changed to produce the same gravity at the surface in both systems
 plotPath = True #Whether to plot or not
@@ -116,7 +116,10 @@ class Body:
         return vel
     def converttoRealGravity(self):
         oldMass = self.mass
-        self.mass = self.mass*self.surface_radius
+        if not(np.isnan(self.water_radius)):
+            self.mass = self.mass*self.water_radius #If it has a water radius (only Giant's Deep does) use that instead of the surface radius, since most people consider the water surface to be the surface 
+        else:
+            self.mass = self.mass*self.surface_radius
         self.isGravityLinear = False
         print(f"{self.name} mass has been changed from {oldMass} to {self.mass}")
 class probe:
@@ -410,11 +413,16 @@ def simulationPikmin(cannonIndex:int,launchMag:float,bodiesList:list[Body],launc
         print(f"[{mp.current_process().name}] Starting simulation with {n_sims} runs...")
     results = makeResultsTemplate(n_sims) 
     if launchMag is None:
+        randomizeMag = True
         launchMag = np.random.uniform(minLaunchMag, maxLaunchMag)
+    else:
+        randomizeMag = False
     pikmin = probe(launchbodyindex=cannonIndex,launchvel=launchMag,Bodies=bodiesList,launchunitvector=launchUnitVector,launchtime=launchTime,endtime=endtime,timestep=timestep)
     for i in range(n_sims):
         #How to change the simulation each run
         newUnitVector = random_3d_unit_vector()
+        if randomizeMag:
+            launchMag = np.random.uniform(minLaunchMag, maxLaunchMag)
         pikmin.ChangeLaunchConditions(cannonIndex,launchMag,newUnitVector,launchTime)
         #Run the simulation
         pikmin.runSimulation(False)
@@ -542,7 +550,7 @@ if Mass_Simulation_Mode:
         
         with mp.Pool(processes=pikmin_on_field) as pool:
             for _  in range(total_n_pikmin_to_make):
-                pool.apply_async(simulationPikmin, args=(CannonIndex,None, Bodies, unitvec, 20, 1/60, 22, n_sim_per_pikmin, outputdir, True,250,500))
+                pool.apply_async(simulationPikmin, args=(CannonIndex,None, Bodies, unitvec, 0, 1/60, 22, n_sim_per_pikmin, outputdir, True,250,500))
                 #def simulationPikmin(cannonIndex:int,launchMag:float,bodiesList:list[Body],launchUnitVector:np.ndarray,launchTime:float,timestep:float,endtime:float,n_sims:int,outputdir:str,printoutput:bool=False,minLaunchMag:float=250,maxLaunchMag:float=1000):
                 #NOTE: This is where you change the settings for mass simulation mode
             pool.close()

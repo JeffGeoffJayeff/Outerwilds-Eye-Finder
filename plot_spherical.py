@@ -17,7 +17,7 @@ import datashader.transfer_functions as tf
 
 outputfolder = "ImageOutputs/"
 cube_map_plot = True #If true makes cube map images
-inputfolder = "Simulations/launchtimetest"
+inputfolder = "Simulations/0FrontFixedGravity250-500"
 
 def load_npy_files(folder_path):
     """Load all npy files from a folder and return combined data."""
