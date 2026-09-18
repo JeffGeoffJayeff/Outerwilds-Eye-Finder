@@ -245,6 +245,7 @@ class probe:
             Y_1 = self.path.y[[0,2,4],index].T
             position = Y_1 + (Y_2-Y_1)/(self.timestep)*(time-self.path.t[index])
         else:
+            index = len(self.path.t) - 1 #Just use the last entry who cares
             position = self.path.y[[0,2,4],index].T
         return position
     def printSimulationEvents(self):

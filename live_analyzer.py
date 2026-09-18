@@ -35,8 +35,10 @@ class terminal:
             "SortbyVisits": self.sortbyVisits,
             "SumVisits": self.sumVisits,
             "LookupLaunch": self.lookupLaunchConditions,
+            "LaunchIndex": self.launchIndex,
             "LookupIndex": self.lookupIndex,
-            "LaunchIndex": self.launchIndex
+            "LaunchUUID": self.launchUUID,
+            "LookupUUID": self.lookupUUID
         }
         self.resultsFields = resultsDType
         self.visitFields = [
@@ -139,7 +141,17 @@ class terminal:
         singleSimulation(files,velocity,np.array([unitx,unity,unitz]),launchtime,1/60,22,not(plotPlanets))
         if plotPlanets:
             SMC(Stepsize = 1, EndMinute = 22,graphresults=True,Path=True,BodyPaths=False)
-
+    def launchUUID(self,uuid:str,plotPlanets:bool=False):
+        if "UUID" not in self.dataset.dtype.names:
+            print("ERROR: UUID column not found in dataset")
+            return
+        index = np.where(self.dataset['UUID'] == uuid)[0]
+        if len(index) == 0:
+            print(f"ERROR: UUID {uuid} not found in dataset")
+            return
+        index = index[0]
+        self.launchIndex(index,plotPlanets)
+    
     def loadFile(self, filename):
         data = np.load(filename)
         self.dataset.append(data)
@@ -202,9 +214,23 @@ class terminal:
         unity = self.dataset['Relative Launch y'][index]
         unitz = self.dataset['Relative Launch z'][index]
         velocity = self.dataset['Relative Launch Velocity'][index]
-        print(f"Closest simulation to point ({x},{y},{z}) is at index {index} with the following parameters: \nDistance to point: {self.dataset['Distance to Point'][index]}\nLaunch velocity: {velocity}\nUnit vector: ({unitx}, {unity}, {unitz})\nLaunch time: {time} seconds")
+        uuid = self.dataset['UUID'][index]
+        print(f"Closest simulation to point ({x},{y},{z}) is at index {index}, UUID {uuid} with the following parameters: \nDistance to point: {self.dataset['Distance to Point'][index]}\nLaunch velocity: {velocity}\nUnit vector: ({unitx}, {unity}, {unitz})\nLaunch time: {time} seconds")
         return np.array([unitx,unity,unitz,velocity,index,time])
-    
+    def lookupUUID(self,uuid:str):
+        if "UUID" not in self.dataset.dtype.names:
+            print("ERROR: UUID column not found in dataset")
+            return
+        index = np.where(self.dataset['UUID'] == uuid)[0]
+        if len(index) == 0:
+            print(f"ERROR: UUID {uuid} not found in dataset")
+            return
+        index = index[0]
+        row = self.dataset[index].tolist()
+        table = [list(self.dataset.dtype.names),row]
+        table = np.rot90(np.array(table))
+        outputTable = tabulate(table, tablefmt="pretty")
+        print(outputTable)
     def helpCommand(self):
         print("Current Commands:")
         for cmd in self.commands:
@@ -302,6 +328,8 @@ class terminal:
             visitnums.append(tableEntry)
         outputTable = tabulate(visitnums,showindex=True,headers=["Body","Visits","Visit/Visits %","Visit/Sim %","Hits","Hits/Hits %","Hit/Sim %"],tablefmt="pretty")
         print(outputTable)
+        print(f"Of {self.simulations:,} simulations, {self.dataset['Hit Something'].sum():,} simulations hit something, for a total hit rate of {self.dataset['Hit Something'].sum()/self.simulations*100:.3f}%")
+        print(f"Of {self.simulations:,} simulations, {self.dataset['Reached Eye'].sum():,} simulations reached the eye shell, for a total reach rate of {self.dataset['Reached Eye'].sum()/self.simulations*100:.3f}%")
 def main():
     print("Start of session")
     termGuy = terminal()
